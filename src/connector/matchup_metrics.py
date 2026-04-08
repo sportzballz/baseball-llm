@@ -106,6 +106,20 @@ def apply_cached_metrics_to_advantage(adv_score, game_data, metrics_index, weigh
             away_bonus += 0.35
             reasons.append(f"moneyline_move_away={ml_move}")
 
+    consensus = market.get("consensus") or {}
+    ml_range = _safe_float(consensus.get("moneyline_range"))
+    ml_outliers = _safe_float(consensus.get("moneyline_outlier_books"))
+    books = _safe_float(consensus.get("books"))
+    if books is not None and books >= 4 and ml_range is not None and ml_range >= 35:
+        # Market disagreement -> reduce confidence / avoid overcommit.
+        home_bonus -= 0.10
+        away_bonus -= 0.10
+        reasons.append(f"market_dispersion_range={ml_range:.1f}")
+    if ml_outliers is not None and ml_outliers >= 2:
+        home_bonus -= 0.06
+        away_bonus -= 0.06
+        reasons.append(f"market_outliers={int(ml_outliers)}")
+
     home_pitch = ((((metric.get("home") or {}).get("probable_pitcher") or {}).get("stats") or {}))
     away_pitch = ((((metric.get("away") or {}).get("probable_pitcher") or {}).get("stats") or {}))
     hk = _safe_float(home_pitch.get("k_bb"))
@@ -118,6 +132,35 @@ def apply_cached_metrics_to_advantage(adv_score, game_data, metrics_index, weigh
         elif diff <= -0.6:
             away_bonus += 0.30
             reasons.append(f"pitcher_kbb_away_edge={abs(diff):.2f}")
+
+    park = metric.get("park_factors") or {}
+    run_factor = _safe_float(park.get("run_factor"))
+    hr_factor = _safe_float(park.get("hr_factor"))
+    if run_factor is not None and hr_factor is not None:
+        # In run-suppressing parks, give small bonus to stronger starting pitching profile.
+        if run_factor <= 0.96 and hr_factor <= 0.93:
+            h_k9 = _safe_float(((((metric.get("home") or {}).get("probable_pitcher") or {}).get("advanced") or {}).get("k9")))
+            a_k9 = _safe_float(((((metric.get("away") or {}).get("probable_pitcher") or {}).get("advanced") or {}).get("k9")))
+            if h_k9 is not None and a_k9 is not None:
+                k9_diff = h_k9 - a_k9
+                if k9_diff >= 0.8:
+                    home_bonus += 0.10
+                    reasons.append(f"park_pitch_home_edge={k9_diff:.2f}")
+                elif k9_diff <= -0.8:
+                    away_bonus += 0.10
+                    reasons.append(f"park_pitch_away_edge={abs(k9_diff):.2f}")
+
+    lineups = metric.get("lineups") or {}
+    hp = _safe_float(lineups.get("home_platoon_score"))
+    ap = _safe_float(lineups.get("away_platoon_score"))
+    if hp is not None and ap is not None:
+        p_diff = hp - ap
+        if p_diff >= 0.10:
+            home_bonus += 0.18
+            reasons.append(f"platoon_home_edge={p_diff:.3f}")
+        elif p_diff <= -0.10:
+            away_bonus += 0.18
+            reasons.append(f"platoon_away_edge={abs(p_diff):.3f}")
 
     home_off = (((metric.get("home") or {}).get("offense") or {}))
     away_off = (((metric.get("away") or {}).get("offense") or {}))

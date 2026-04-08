@@ -175,3 +175,5 @@ src/picks/*-pick.md
 
 # generated matchup metrics cache
 data/matchup-metrics/*.json
+
+data/player-handedness.json

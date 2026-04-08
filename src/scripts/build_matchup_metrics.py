@@ -9,6 +9,19 @@ from urllib.request import Request, urlopen
 
 ET = ZoneInfo("America/New_York")
 
+PARK_FACTORS = {
+    # Approximate run/HR environment multipliers (1.00 = neutral)
+    "Coors Field": {"run_factor": 1.23, "hr_factor": 1.14},
+    "Great American Ball Park": {"run_factor": 1.08, "hr_factor": 1.22},
+    "Yankee Stadium": {"run_factor": 1.03, "hr_factor": 1.16},
+    "Citizens Bank Park": {"run_factor": 1.04, "hr_factor": 1.14},
+    "Dodger Stadium": {"run_factor": 0.98, "hr_factor": 0.97},
+    "Oracle Park": {"run_factor": 0.93, "hr_factor": 0.84},
+    "Petco Park": {"run_factor": 0.95, "hr_factor": 0.90},
+    "T-Mobile Park": {"run_factor": 0.95, "hr_factor": 0.92},
+    "loanDepot park": {"run_factor": 0.94, "hr_factor": 0.89},
+}
+
 
 def get_secret(name: str):
     val = os.environ.get(name)
@@ -146,6 +159,82 @@ def avg(nums):
     return sum(vals) / len(vals)
 
 
+def stddev(nums):
+    vals = [float(x) for x in nums if x is not None]
+    n = len(vals)
+    if n < 2:
+        return 0.0
+    m = sum(vals) / n
+    var = sum((x - m) ** 2 for x in vals) / n
+    return var ** 0.5
+
+
+def load_handedness_cache():
+    p = Path(__file__).resolve().parents[2] / "data" / "player-handedness.json"
+    if not p.exists():
+        return {}, p
+    try:
+        return json.loads(p.read_text()), p
+    except Exception:
+        return {}, p
+
+
+def save_handedness_cache(cache, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cache, indent=2))
+
+
+def fetch_person_handedness(player_id: int):
+    data = get_json(f"https://statsapi.mlb.com/api/v1/people/{player_id}")
+    people = data.get("people") or []
+    if not people:
+        return {"bat": None, "throw": None}
+    p = people[0]
+    bat = ((p.get("batSide") or {}).get("code"))
+    throw = ((p.get("pitchHand") or {}).get("code"))
+    return {"bat": bat, "throw": throw}
+
+
+def get_handedness(player_id: int, cache: dict):
+    k = str(player_id)
+    if k in cache:
+        return cache[k]
+    try:
+        v = fetch_person_handedness(player_id)
+    except Exception:
+        v = {"bat": None, "throw": None}
+    cache[k] = v
+    return v
+
+
+def lineup_platoon_score(team_blob: dict, opp_throw: str, handedness_cache: dict):
+    batting_order = (team_blob.get("battingOrder") or [])[:9]
+    players = team_blob.get("players") or {}
+    if not batting_order or not opp_throw:
+        return None
+
+    favorable = 0.0
+    total = 0.0
+    for pid in batting_order:
+        pdata = players.get(f"ID{pid}") or {}
+        person_id = ((pdata.get("person") or {}).get("id")) or pid
+        hand = get_handedness(int(person_id), handedness_cache)
+        bat = (hand.get("bat") or "").upper()
+        if not bat:
+            continue
+        total += 1.0
+        if bat == "S":
+            favorable += 0.75
+        elif opp_throw.upper() == "R" and bat == "L":
+            favorable += 1.0
+        elif opp_throw.upper() == "L" and bat == "R":
+            favorable += 1.0
+
+    if total == 0:
+        return None
+    return round(favorable / total, 3)
+
+
 def fetch_odds_api_odds(date_str: str):
     key = get_secret("ODDS_API_KEY") or get_secret("THE_ODDS_API_KEY")
     if not key:
@@ -197,6 +286,11 @@ def fetch_odds_api_odds(date_str: str):
         cur_ml = avg(home_ml)
         cur_spread = avg(spread_home)
         cur_total = avg(total_over)
+        ml_stddev = stddev(home_ml)
+        ml_range = (max(home_ml) - min(home_ml)) if len(home_ml) >= 2 else 0
+        ml_outliers = 0
+        if home_ml and cur_ml is not None:
+            ml_outliers = sum(1 for x in home_ml if x is not None and abs(x - cur_ml) >= 20)
 
         out[k] = {
             "moneyline_open_home": safe_int(cur_ml),
@@ -206,6 +300,12 @@ def fetch_odds_api_odds(date_str: str):
             "total_open": round(cur_total, 2) if cur_total is not None else None,
             "total_current": round(cur_total, 2) if cur_total is not None else None,
             "lastUpdated": g.get("commence_time"),
+            "consensus": {
+                "books": len(home_ml),
+                "moneyline_stddev": round(ml_stddev, 2),
+                "moneyline_range": safe_int(ml_range),
+                "moneyline_outlier_books": ml_outliers,
+            },
         }
 
     return out, {
@@ -392,6 +492,7 @@ def build(date_str: str):
     pitcher_cache = {}
     pitcher_adv_cache = {}
     bullpen_cache = {}
+    handedness_cache, handedness_cache_path = load_handedness_cache()
     try:
         bullpen_cache = compute_bullpen_freshness(date_str)
     except Exception:
@@ -412,11 +513,12 @@ def build(date_str: str):
 
         live = {}
         both_lineups_announced = False
+        lineup_box = {}
         try:
             live = fetch_live_feed(game_pk)
-            box = (((live.get("liveData") or {}).get("boxscore") or {}).get("teams") or {})
-            home_batting = ((box.get("home") or {}).get("battingOrder") or [])
-            away_batting = ((box.get("away") or {}).get("battingOrder") or [])
+            lineup_box = (((live.get("liveData") or {}).get("boxscore") or {}).get("teams") or {})
+            home_batting = ((lineup_box.get("home") or {}).get("battingOrder") or [])
+            away_batting = ((lineup_box.get("away") or {}).get("battingOrder") or [])
             both_lineups_announced = len(home_batting) >= 9 and len(away_batting) >= 9
         except Exception:
             pass
@@ -490,6 +592,17 @@ def build(date_str: str):
             elif away_f + 8 <= home_f:
                 bp_edge = "away_fresher"
 
+        home_throw = get_handedness(home_pitcher_id, handedness_cache).get("throw") if home_pitcher_id else None
+        away_throw = get_handedness(away_pitcher_id, handedness_cache).get("throw") if away_pitcher_id else None
+        home_platoon = lineup_platoon_score((lineup_box.get("home") or {}), away_throw, handedness_cache)
+        away_platoon = lineup_platoon_score((lineup_box.get("away") or {}), home_throw, handedness_cache)
+        platoon_edge = "neutral"
+        if home_platoon is not None and away_platoon is not None:
+            if home_platoon - away_platoon >= 0.10:
+                platoon_edge = "home"
+            elif away_platoon - home_platoon >= 0.10:
+                platoon_edge = "away"
+
         def pitcher_view(s):
             return {
                 "era": safe_float(s.get("era")),
@@ -545,6 +658,7 @@ def build(date_str: str):
             "game_time": g.get("gameDate"),
             "status": (((g.get("status") or {}).get("detailedState")) or ""),
             "venue": (g.get("venue") or {}).get("name"),
+            "park_factors": PARK_FACTORS.get((g.get("venue") or {}).get("name"), {"run_factor": 1.0, "hr_factor": 1.0}),
             "home": {
                 "id": home_id,
                 "name": home_name,
@@ -571,6 +685,11 @@ def build(date_str: str):
             },
             "lineups": {
                 "both_announced": both_lineups_announced,
+                "home_platoon_score": home_platoon,
+                "away_platoon_score": away_platoon,
+                "platoon_edge": platoon_edge,
+                "home_pitcher_throw_hand": home_throw,
+                "away_pitcher_throw_hand": away_throw,
             },
             "market": {
                 "source": odds_meta.get("source"),
@@ -583,6 +702,7 @@ def build(date_str: str):
                 "total_current": odds.get("total_current"),
                 "implied_home_prob": implied_home,
                 "last_updated": odds.get("lastUpdated"),
+                "consensus": odds.get("consensus") or {},
             },
             "weather": weather,
             "bullpen": {
@@ -596,6 +716,8 @@ def build(date_str: str):
         }
 
         matchups.append(matchup)
+
+    save_handedness_cache(handedness_cache, handedness_cache_path)
 
     return {
         "generated_at": datetime.now(ET).isoformat(),

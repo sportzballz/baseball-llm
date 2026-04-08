@@ -140,3 +140,6 @@ The commentary includes (best effort):
 - Team offense advanced: ISO, BABIP, BB/PA, K/PA, HR/PA, pitches/PA
 - Probable pitcher advanced: K/9, BB/9, HR/9, K/BB, OBP/SLG/OPS allowed
 - Bullpen freshness: 3-day workload-derived home/away fatigue and freshness edge
+- Market consensus dispersion: books count, moneyline range/stddev, outlier-book count
+- Park factors: run factor and HR factor per venue (neutral fallback)
+- Lineup platoon edge: announced lineup handedness vs opposing probable pitcher throw hand
