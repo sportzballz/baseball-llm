@@ -132,6 +132,60 @@ def apply_cached_metrics_to_advantage(adv_score, game_data, metrics_index, weigh
             away_bonus += 0.25
             reasons.append(f"ops_away_edge={abs(odiff):.3f}")
 
+    home_off_adv = (((metric.get("home") or {}).get("offense_advanced") or {}))
+    away_off_adv = (((metric.get("away") or {}).get("offense_advanced") or {}))
+    h_iso = _safe_float(home_off_adv.get("iso"))
+    a_iso = _safe_float(away_off_adv.get("iso"))
+    if h_iso is not None and a_iso is not None:
+        iso_diff = h_iso - a_iso
+        if iso_diff >= 0.020:
+            home_bonus += 0.18
+            reasons.append(f"iso_home_edge={iso_diff:.3f}")
+        elif iso_diff <= -0.020:
+            away_bonus += 0.18
+            reasons.append(f"iso_away_edge={abs(iso_diff):.3f}")
+
+    h_bbpa = _safe_float(home_off_adv.get("bb_per_pa"))
+    a_bbpa = _safe_float(away_off_adv.get("bb_per_pa"))
+    h_kpa = _safe_float(home_off_adv.get("k_per_pa"))
+    a_kpa = _safe_float(away_off_adv.get("k_per_pa"))
+    if None not in (h_bbpa, a_bbpa, h_kpa, a_kpa):
+        h_disc = h_bbpa - h_kpa
+        a_disc = a_bbpa - a_kpa
+        d_disc = h_disc - a_disc
+        if d_disc >= 0.020:
+            home_bonus += 0.16
+            reasons.append(f"discipline_home_edge={d_disc:.3f}")
+        elif d_disc <= -0.020:
+            away_bonus += 0.16
+            reasons.append(f"discipline_away_edge={abs(d_disc):.3f}")
+
+    home_pitch_adv = ((((metric.get("home") or {}).get("probable_pitcher") or {}).get("advanced") or {}))
+    away_pitch_adv = ((((metric.get("away") or {}).get("probable_pitcher") or {}).get("advanced") or {}))
+
+    h_opsa = _safe_float(home_pitch_adv.get("ops_allowed"))
+    a_opsa = _safe_float(away_pitch_adv.get("ops_allowed"))
+    if h_opsa is not None and a_opsa is not None:
+        # Lower OPS allowed is better for the pitcher's team.
+        p_diff = a_opsa - h_opsa
+        if p_diff >= 0.030:
+            home_bonus += 0.20
+            reasons.append(f"pitch_ops_allowed_home_edge={p_diff:.3f}")
+        elif p_diff <= -0.030:
+            away_bonus += 0.20
+            reasons.append(f"pitch_ops_allowed_away_edge={abs(p_diff):.3f}")
+
+    h_hr9 = _safe_float(home_pitch_adv.get("hr9"))
+    a_hr9 = _safe_float(away_pitch_adv.get("hr9"))
+    if h_hr9 is not None and a_hr9 is not None:
+        hr_diff = a_hr9 - h_hr9
+        if hr_diff >= 0.20:
+            home_bonus += 0.12
+            reasons.append(f"pitch_hr9_home_edge={hr_diff:.2f}")
+        elif hr_diff <= -0.20:
+            away_bonus += 0.12
+            reasons.append(f"pitch_hr9_away_edge={abs(hr_diff):.2f}")
+
     bullpen = metric.get("bullpen") or {}
     home_f = _safe_float(bullpen.get("home_fatigue_score"))
     away_f = _safe_float(bullpen.get("away_fatigue_score"))

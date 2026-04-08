@@ -135,3 +135,8 @@ The commentary includes (best effort):
 - [ ] Crowd size
 - [ ] Wind direction
 - [ ] temperature
+
+### Advanced metrics now wired into scoring
+- Team offense advanced: ISO, BABIP, BB/PA, K/PA, HR/PA, pitches/PA
+- Probable pitcher advanced: K/9, BB/9, HR/9, K/BB, OBP/SLG/OPS allowed
+- Bullpen freshness: 3-day workload-derived home/away fatigue and freshness edge

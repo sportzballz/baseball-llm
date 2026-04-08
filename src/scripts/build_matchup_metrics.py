@@ -104,8 +104,22 @@ def fetch_team_hitting(team_id: int, season: int):
     return (splits[0].get("stat") if splits else {}) or {}
 
 
+def fetch_team_hitting_advanced(team_id: int, season: int):
+    qs = urlencode({"stats": "seasonAdvanced", "group": "hitting", "season": season})
+    data = get_json(f"https://statsapi.mlb.com/api/v1/teams/{team_id}/stats?{qs}")
+    splits = (((data or {}).get("stats") or [{}])[0].get("splits") or [])
+    return (splits[0].get("stat") if splits else {}) or {}
+
+
 def fetch_pitcher_stats(player_id: int, season: int):
     qs = urlencode({"stats": "season", "group": "pitching", "season": season})
+    data = get_json(f"https://statsapi.mlb.com/api/v1/people/{player_id}/stats?{qs}")
+    splits = (((data or {}).get("stats") or [{}])[0].get("splits") or [])
+    return (splits[0].get("stat") if splits else {}) or {}
+
+
+def fetch_pitcher_advanced(player_id: int, season: int):
+    qs = urlencode({"stats": "seasonAdvanced", "group": "pitching", "season": season})
     data = get_json(f"https://statsapi.mlb.com/api/v1/people/{player_id}/stats?{qs}")
     splits = (((data or {}).get("stats") or [{}])[0].get("splits") or [])
     return (splits[0].get("stat") if splits else {}) or {}
@@ -374,7 +388,9 @@ def build(date_str: str):
             odds_map, odds_meta = {}, {"source": "sportspage", "used": False, "error": str(e)}
 
     team_cache = {}
+    team_adv_cache = {}
     pitcher_cache = {}
+    pitcher_adv_cache = {}
     bullpen_cache = {}
     try:
         bullpen_cache = compute_bullpen_freshness(date_str)
@@ -416,6 +432,17 @@ def build(date_str: str):
             except Exception:
                 team_cache[away_id] = {}
 
+        if home_id not in team_adv_cache:
+            try:
+                team_adv_cache[home_id] = fetch_team_hitting_advanced(home_id, season)
+            except Exception:
+                team_adv_cache[home_id] = {}
+        if away_id not in team_adv_cache:
+            try:
+                team_adv_cache[away_id] = fetch_team_hitting_advanced(away_id, season)
+            except Exception:
+                team_adv_cache[away_id] = {}
+
         home_pitcher_id = home_prob.get("id")
         away_pitcher_id = away_prob.get("id")
 
@@ -429,6 +456,17 @@ def build(date_str: str):
                 pitcher_cache[away_pitcher_id] = fetch_pitcher_stats(away_pitcher_id, season)
             except Exception:
                 pitcher_cache[away_pitcher_id] = {}
+
+        if home_pitcher_id and home_pitcher_id not in pitcher_adv_cache:
+            try:
+                pitcher_adv_cache[home_pitcher_id] = fetch_pitcher_advanced(home_pitcher_id, season)
+            except Exception:
+                pitcher_adv_cache[home_pitcher_id] = {}
+        if away_pitcher_id and away_pitcher_id not in pitcher_adv_cache:
+            try:
+                pitcher_adv_cache[away_pitcher_id] = fetch_pitcher_advanced(away_pitcher_id, season)
+            except Exception:
+                pitcher_adv_cache[away_pitcher_id] = {}
 
         odds = odds_map.get(matchup_key(home_name, away_name), {})
 
@@ -461,6 +499,18 @@ def build(date_str: str):
                 "k9": safe_float(s.get("strikeoutsPer9Inn")),
             }
 
+        def pitcher_advanced_view(s):
+            return {
+                "k9": safe_float(s.get("strikeoutsPer9")),
+                "bb9": safe_float(s.get("baseOnBallsPer9")),
+                "hr9": safe_float(s.get("homeRunsPer9")),
+                "k_bb": safe_float(s.get("strikesoutsToWalks")),
+                "obp_allowed": safe_float(s.get("obp")),
+                "slg_allowed": safe_float(s.get("slg")),
+                "ops_allowed": safe_float(s.get("ops")),
+                "babip_allowed": safe_float(s.get("babip")),
+            }
+
         def offense_view(s):
             return {
                 "runs": safe_int(s.get("runs")),
@@ -469,6 +519,16 @@ def build(date_str: str):
                 "slg": safe_float(s.get("slg")),
                 "k": safe_int(s.get("strikeOuts")),
                 "bb": safe_int(s.get("baseOnBalls")),
+            }
+
+        def offense_advanced_view(s):
+            return {
+                "iso": safe_float(s.get("iso")),
+                "babip": safe_float(s.get("babip")),
+                "bb_per_pa": safe_float(s.get("walksPerPlateAppearance")),
+                "k_per_pa": safe_float(s.get("strikeoutsPerPlateAppearance")),
+                "hr_per_pa": safe_float(s.get("homeRunsPerPlateAppearance")),
+                "pitches_per_pa": safe_float(s.get("pitchesPerPlateAppearance")),
             }
 
         ml_open = odds.get("moneyline_open_home")
@@ -489,20 +549,24 @@ def build(date_str: str):
                 "id": home_id,
                 "name": home_name,
                 "offense": offense_view(team_cache.get(home_id, {})),
+                "offense_advanced": offense_advanced_view(team_adv_cache.get(home_id, {})),
                 "probable_pitcher": {
                     "id": home_pitcher_id,
                     "name": home_prob.get("fullName"),
                     "stats": pitcher_view(pitcher_cache.get(home_pitcher_id, {})),
+                    "advanced": pitcher_advanced_view(pitcher_adv_cache.get(home_pitcher_id, {})),
                 },
             },
             "away": {
                 "id": away_id,
                 "name": away_name,
                 "offense": offense_view(team_cache.get(away_id, {})),
+                "offense_advanced": offense_advanced_view(team_adv_cache.get(away_id, {})),
                 "probable_pitcher": {
                     "id": away_pitcher_id,
                     "name": away_prob.get("fullName"),
                     "stats": pitcher_view(pitcher_cache.get(away_pitcher_id, {})),
+                    "advanced": pitcher_advanced_view(pitcher_adv_cache.get(away_pitcher_id, {})),
                 },
             },
             "lineups": {
