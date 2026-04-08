@@ -596,7 +596,6 @@ def _metrics_summary_for_commentary(metric, winner_name, loser_name):
         return ""
 
     home = ((metric.get("home") or {}).get("name") or "")
-    away = ((metric.get("away") or {}).get("name") or "")
     winner_is_home = str(winner_name).strip().lower() == str(home).strip().lower()
 
     bits = []
@@ -612,6 +611,34 @@ def _metrics_summary_for_commentary(metric, winner_name, loser_name):
         else:
             bits.append("pricing context is closer to balanced")
 
+    # Always surface bullpen fatigue context when available.
+    bullpen = metric.get("bullpen") or {}
+    hf = bullpen.get("home_fatigue_score")
+    af = bullpen.get("away_fatigue_score")
+    if isinstance(hf, (int, float)) and isinstance(af, (int, float)):
+        diff = (af - hf) if winner_is_home else (hf - af)
+        if diff >= 8:
+            bits.append(f"bullpen fatigue context favors this side (freshness edge ~{int(diff)} points)")
+        elif diff <= -8:
+            bits.append(f"bullpen fatigue context leans against this side (~{int(abs(diff))} points)")
+        else:
+            bits.append("bullpen fatigue context is mostly even")
+
+    # Always surface platoon split context when available.
+    lineups = metric.get("lineups") or {}
+    hp = lineups.get("home_platoon_score")
+    ap = lineups.get("away_platoon_score")
+    if isinstance(hp, (int, float)) and isinstance(ap, (int, float)):
+        score = hp if winner_is_home else ap
+        opp = ap if winner_is_home else hp
+        delta = score - opp
+        if delta >= 0.08:
+            bits.append(f"platoon split setup supports this side (lineup fit +{delta:.2f})")
+        elif delta <= -0.08:
+            bits.append(f"platoon split setup is less favorable (lineup fit {delta:.2f})")
+        else:
+            bits.append("platoon split setup is close to neutral")
+
     consensus = market.get("consensus") or {}
     rng = consensus.get("moneyline_range")
     books = consensus.get("books")
@@ -620,20 +647,6 @@ def _metrics_summary_for_commentary(metric, winner_name, loser_name):
             bits.append("books are tightly aligned")
         elif rng >= 30:
             bits.append("books show wider disagreement")
-
-    bullpen = metric.get("bullpen") or {}
-    bp_edge = str(bullpen.get("edge") or "").lower()
-    if bp_edge == "home_fresher":
-        bits.append("bullpen freshness favors the home side" if winner_is_home else "bullpen freshness leans against this side")
-    elif bp_edge == "away_fresher":
-        bits.append("bullpen freshness favors the away side" if not winner_is_home else "bullpen freshness leans against this side")
-
-    lineups = metric.get("lineups") or {}
-    platoon_edge = str(lineups.get("platoon_edge") or "").lower()
-    if platoon_edge == "home":
-        bits.append("lineup handedness setup favors home" if winner_is_home else "lineup handedness setup favors away")
-    elif platoon_edge == "away":
-        bits.append("lineup handedness setup favors away" if not winner_is_home else "lineup handedness setup favors home")
 
     park = metric.get("park_factors") or {}
     run_factor = park.get("run_factor")
@@ -646,7 +659,7 @@ def _metrics_summary_for_commentary(metric, winner_name, loser_name):
     if not bits:
         return "Expanded matchup metrics were neutral."
 
-    return "; ".join(bits[:3]).capitalize() + "."
+    return "; ".join(bits[:4]).capitalize() + "."
 
 
 def write_daily_pick_markdown(predictions, odds_data, model_name):
