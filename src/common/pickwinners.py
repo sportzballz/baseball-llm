@@ -7,6 +7,7 @@ from  common.util import *
 from  connector.sportsbook import get_odds
 from  connector.stats import *
 from  connector.mlbstartinglineups import *
+from connector.matchup_metrics import load_cached_metrics, apply_cached_metrics_to_advantage
 from connector.pick_markdown import write_daily_pick_markdown
 from connector.pick_site_publish import publish_daily_site
 from  common.objects import AdvantageScore
@@ -103,6 +104,16 @@ def main(model, model_hitting_fn, model_pitching_fn, model_vs_fn):
     odds_data = get_odds()
     # odds_data = {'results': []}
 
+    use_cached_metrics = os.environ.get("USE_CACHED_MATCHUP_METRICS", "true").strip().lower() in ("1", "true", "yes", "on")
+    try:
+        metrics_weight = float(os.environ.get("CACHED_METRICS_WEIGHT", "1.0"))
+    except Exception:
+        metrics_weight = 1.0
+    metrics_index = load_cached_metrics() if use_cached_metrics else {"by_game_pk": {}, "by_matchup": {}, "meta": {"found": False}}
+    if use_cached_metrics:
+        meta = metrics_index.get("meta", {})
+        print(f"Cached metrics enabled: found={meta.get('found')} count={meta.get('count', 0)} source={meta.get('odds_source', {}).get('source')}")
+
     winners = []
     day = datetime.now(pytz.timezone('US/Eastern')).date()
     for team in teams:
@@ -122,6 +133,16 @@ def main(model, model_hitting_fn, model_pitching_fn, model_vs_fn):
                 adv_score = model_hitting_fn(adv_score, game_data, model, lineups)
                 adv_score = model_pitching_fn(adv_score, game_data, model, lineups)
                 adv_score = model_vs_fn(adv_score, game_data, model, lineups)
+                if use_cached_metrics:
+                    adv_score, metrics_applied = apply_cached_metrics_to_advantage(
+                        adv_score, game_data, metrics_index, weight=metrics_weight
+                    )
+                    if metrics_applied and metrics_applied.get("applied"):
+                        print(
+                            "Cached metrics adjustment "
+                            f"home+={metrics_applied.get('home_bonus')} away+={metrics_applied.get('away_bonus')} "
+                            f"reasons={';'.join(metrics_applied.get('reasons', []))}"
+                        )
                 winners.append(select_winner(adv_score, game_data, odds_data))
                 print(adv_score.to_string())
 
