@@ -2035,26 +2035,50 @@ def _run(cmd, cwd):
 def _redesign_css(variant: int) -> str:
     if variant == 1:
         return """
-        body{background:#0a0f1a!important}
-        .wrap{max-width:1200px!important}
-        .pick-card,.card{border-radius:10px!important;border-color:#2f3f62!important;background:#0f1728!important}
-        h1,h2{letter-spacing:.01em}
-        .lede{font-size:17px!important;line-height:1.62!important}
+        :root{--bg:#f4f7fb!important;--panel:#ffffff!important;--ink:#0f172a!important;--muted:#475569!important;--line:#c7d2e3!important;--accent:#1d4ed8!important;--accent2:#0ea5e9!important}
+        body{background:linear-gradient(180deg,#eef3fb 0%,#f8fbff 100%)!important;color:#0f172a!important}
+        .wrap{max-width:1240px!important}
+        header,.hero{background:#ffffff!important;border:1px solid #d6e0ef!important;box-shadow:0 8px 26px rgba(15,23,42,.08)!important}
+        .pick-card,.card{border-radius:14px!important;border-color:#d6e0ef!important;background:#ffffff!important;box-shadow:0 10px 24px rgba(15,23,42,.06)!important}
+        .meta-grid div,.tcard{background:#f8fbff!important;border-color:#d8e3f3!important}
+        .lede{font-size:18px!important;line-height:1.65!important;color:#0f172a!important}
+        .nav-toolbar .toolbar-group{background:#f8fbff!important;border-color:#d6e0ef!important}
+        .nav-toolbar .toolbar-group summary{background:#e8f0ff!important;color:#0f172a!important;border-color:#c7d6ef!important}
+        .res-win{background:#e7f8ef!important;color:#065f46!important;border-color:#86efac!important}
+        .res-loss{background:#feecec!important;color:#991b1b!important;border-color:#fecaca!important}
+        .res-pending{background:#eaf2ff!important;color:#1e3a8a!important;border-color:#bfdbfe!important}
         """
     if variant == 2:
         return """
-        body{background:#0d1117!important}
-        .wrap{max-width:1280px!important}
-        .pick-card,.card{border-radius:16px!important;border-color:#2c466f!important;background:linear-gradient(180deg,#111b31,#0f182c)!important;box-shadow:0 14px 30px rgba(0,0,0,.28)!important}
-        .meta-grid div{background:rgba(255,255,255,.035)!important}
-        .lede{font-size:18px!important;line-height:1.66!important}
+        :root{--bg:#060b17!important;--panel:#0b1328!important;--ink:#e6f1ff!important;--muted:#93a7cc!important;--line:#28436d!important;--accent:#00d1ff!important;--accent2:#7cff7a!important}
+        body{background:radial-gradient(1200px 700px at 80% -10%, #1b3a7a 0%, transparent 55%), radial-gradient(900px 600px at 0% 0%, #0b4f66 0%, transparent 45%), #050a14!important}
+        .wrap{max-width:1320px!important}
+        header,.hero{background:linear-gradient(135deg,rgba(0,209,255,.14),rgba(124,255,122,.10))!important;border-color:#2f5489!important}
+        .pick-card,.card{border-radius:18px!important;border-color:#2d4f86!important;background:linear-gradient(180deg,#0a142a,#0b1730)!important;box-shadow:0 16px 40px rgba(0,0,0,.36)!important}
+        .meta-grid div,.tcard{background:rgba(255,255,255,.04)!important;border-color:#345d96!important}
+        .lede{font-size:18px!important;line-height:1.68!important;color:#f0f7ff!important}
+        h1,h2{letter-spacing:.02em!important}
+        .nav-toolbar .toolbar-group{background:rgba(11,19,40,.9)!important;border-color:#2d4f86!important}
+        .nav-toolbar .toolbar-group summary{background:linear-gradient(135deg,rgba(0,209,255,.20),rgba(124,255,122,.14))!important;border-color:#3f6daf!important}
+        .res-win{background:rgba(34,197,94,.18)!important;color:#86efac!important;border-color:#34d399!important}
+        .res-loss{background:rgba(239,68,68,.18)!important;color:#fca5a5!important;border-color:#fb7185!important}
+        .res-pending{background:rgba(59,130,246,.18)!important;color:#bfdbfe!important;border-color:#60a5fa!important}
         """
     return """
-    body{background:#0b1324!important}
-    .wrap{max-width:1100px!important}
-    .pick-card,.card{border-radius:8px!important;border-color:#31476d!important;background:#101b30!important;box-shadow:none!important}
-    .meta-grid div{border-style:solid!important}
-    .lede{font-size:16px!important;line-height:1.58!important}
+    :root{--bg:#15120f!important;--panel:#1c1712!important;--ink:#f4ede2!important;--muted:#c8b9a4!important;--line:#5e4c39!important;--accent:#eab308!important;--accent2:#f97316!important}
+    body{background:#14110e!important;color:#f4ede2!important;font-family:Georgia,'Times New Roman',serif!important}
+    .wrap{max-width:1040px!important}
+    header,.hero{background:#1a1510!important;border-color:#6b553f!important;border-radius:10px!important}
+    .pick-card,.card{border-radius:6px!important;border-color:#6b553f!important;background:#1b1611!important;box-shadow:none!important}
+    .meta-grid div,.tcard{background:#17120e!important;border-color:#6b553f!important;border-style:solid!important}
+    .pick-card{border-left:5px solid #eab308!important}
+    h1,h2{font-family:Georgia,'Times New Roman',serif!important;letter-spacing:0!important}
+    .lede{font-size:17px!important;line-height:1.7!important;color:#f7f0e6!important}
+    .nav-toolbar .toolbar-group{background:#17120e!important;border-color:#6b553f!important}
+    .nav-toolbar .toolbar-group summary{background:#2a2118!important;border-color:#7a6148!important;color:#f7e8d5!important}
+    .res-win{background:#1f2f1f!important;color:#bbf7d0!important;border-color:#4d7c0f!important}
+    .res-loss{background:#331f1f!important;color:#fecaca!important;border-color:#b91c1c!important}
+    .res-pending{background:#26221b!important;color:#fde68a!important;border-color:#a16207!important}
     """
 
 
