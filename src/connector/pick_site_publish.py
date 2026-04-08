@@ -2032,75 +2032,34 @@ def _run(cmd, cwd):
     return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True)
 
 
-def _redesign_css(variant: int) -> str:
-    if variant == 1:
-        return """
-        :root{--bg:#f4f7fb!important;--panel:#ffffff!important;--ink:#0f172a!important;--muted:#475569!important;--line:#c7d2e3!important;--accent:#1d4ed8!important;--accent2:#0ea5e9!important}
-        body{background:linear-gradient(180deg,#eef3fb 0%,#f8fbff 100%)!important;color:#0f172a!important}
-        .wrap{max-width:1240px!important}
-        header,.hero{background:#ffffff!important;border:1px solid #d6e0ef!important;box-shadow:0 8px 26px rgba(15,23,42,.08)!important}
-        .pick-card,.card{border-radius:14px!important;border-color:#d6e0ef!important;background:#ffffff!important;box-shadow:0 10px 24px rgba(15,23,42,.06)!important}
-        .meta-grid div,.tcard{background:#f8fbff!important;border-color:#d8e3f3!important}
-        .lede{font-size:18px!important;line-height:1.65!important;color:#0f172a!important}
-        .nav-toolbar .toolbar-group{background:#f8fbff!important;border-color:#d6e0ef!important}
-        .nav-toolbar .toolbar-group summary{background:#e8f0ff!important;color:#0f172a!important;border-color:#c7d6ef!important}
-        .res-win{background:#e7f8ef!important;color:#065f46!important;border-color:#86efac!important}
-        .res-loss{background:#feecec!important;color:#991b1b!important;border-color:#fecaca!important}
-        .res-pending{background:#eaf2ff!important;color:#1e3a8a!important;border-color:#bfdbfe!important}
-        """
-    if variant == 2:
-        return """
-        :root{--bg:#060b17!important;--panel:#0b1328!important;--ink:#e6f1ff!important;--muted:#93a7cc!important;--line:#28436d!important;--accent:#00d1ff!important;--accent2:#7cff7a!important}
-        body{background:radial-gradient(1200px 700px at 80% -10%, #1b3a7a 0%, transparent 55%), radial-gradient(900px 600px at 0% 0%, #0b4f66 0%, transparent 45%), #050a14!important}
-        .wrap{max-width:1320px!important}
-        header,.hero{background:linear-gradient(135deg,rgba(0,209,255,.14),rgba(124,255,122,.10))!important;border-color:#2f5489!important}
-        .pick-card,.card{border-radius:18px!important;border-color:#2d4f86!important;background:linear-gradient(180deg,#0a142a,#0b1730)!important;box-shadow:0 16px 40px rgba(0,0,0,.36)!important}
-        .meta-grid div,.tcard{background:rgba(255,255,255,.04)!important;border-color:#345d96!important}
-        .lede{font-size:18px!important;line-height:1.68!important;color:#f0f7ff!important}
-        h1,h2{letter-spacing:.02em!important}
-        .nav-toolbar .toolbar-group{background:rgba(11,19,40,.9)!important;border-color:#2d4f86!important}
-        .nav-toolbar .toolbar-group summary{background:linear-gradient(135deg,rgba(0,209,255,.20),rgba(124,255,122,.14))!important;border-color:#3f6daf!important}
-        .res-win{background:rgba(34,197,94,.18)!important;color:#86efac!important;border-color:#34d399!important}
-        .res-loss{background:rgba(239,68,68,.18)!important;color:#fca5a5!important;border-color:#fb7185!important}
-        .res-pending{background:rgba(59,130,246,.18)!important;color:#bfdbfe!important;border-color:#60a5fa!important}
-        """
+def _preferred_theme_css() -> str:
     return """
-    :root{--bg:#15120f!important;--panel:#1c1712!important;--ink:#f4ede2!important;--muted:#c8b9a4!important;--line:#5e4c39!important;--accent:#eab308!important;--accent2:#f97316!important}
-    body{background:#14110e!important;color:#f4ede2!important;font-family:Georgia,'Times New Roman',serif!important}
-    .wrap{max-width:1040px!important}
-    header,.hero{background:#1a1510!important;border-color:#6b553f!important;border-radius:10px!important}
-    .pick-card,.card{border-radius:6px!important;border-color:#6b553f!important;background:#1b1611!important;box-shadow:none!important}
-    .meta-grid div,.tcard{background:#17120e!important;border-color:#6b553f!important;border-style:solid!important}
-    .pick-card{border-left:5px solid #eab308!important}
-    h1,h2{font-family:Georgia,'Times New Roman',serif!important;letter-spacing:0!important}
-    .lede{font-size:17px!important;line-height:1.7!important;color:#f7f0e6!important}
-    .nav-toolbar .toolbar-group{background:#17120e!important;border-color:#6b553f!important}
-    .nav-toolbar .toolbar-group summary{background:#2a2118!important;border-color:#7a6148!important;color:#f7e8d5!important}
-    .res-win{background:#1f2f1f!important;color:#bbf7d0!important;border-color:#4d7c0f!important}
-    .res-loss{background:#331f1f!important;color:#fecaca!important;border-color:#b91c1c!important}
-    .res-pending{background:#26221b!important;color:#fde68a!important;border-color:#a16207!important}
+    :root{--bg:#060b17!important;--panel:#0b1328!important;--ink:#e6f1ff!important;--muted:#93a7cc!important;--line:#28436d!important;--accent:#00d1ff!important;--accent2:#7cff7a!important}
+    body{background:radial-gradient(1200px 700px at 80% -10%, #1b3a7a 0%, transparent 55%), radial-gradient(900px 600px at 0% 0%, #0b4f66 0%, transparent 45%), #050a14!important}
+    .wrap{max-width:1320px!important}
+    header,.hero{background:linear-gradient(135deg,rgba(0,209,255,.14),rgba(124,255,122,.10))!important;border-color:#2f5489!important}
+    .pick-card,.card{border-radius:18px!important;border-color:#2d4f86!important;background:linear-gradient(180deg,#0a142a,#0b1730)!important;box-shadow:0 16px 40px rgba(0,0,0,.36)!important}
+    .meta-grid div,.tcard{background:rgba(255,255,255,.04)!important;border-color:#345d96!important}
+    .lede{font-size:18px!important;line-height:1.68!important;color:#f0f7ff!important}
+    h1,h2{letter-spacing:.02em!important}
+    .nav-toolbar .toolbar-group{background:rgba(11,19,40,.9)!important;border-color:#2d4f86!important}
+    .nav-toolbar .toolbar-group summary{background:linear-gradient(135deg,rgba(0,209,255,.20),rgba(124,255,122,.14))!important;border-color:#3f6daf!important}
+    .res-win{background:rgba(34,197,94,.18)!important;color:#86efac!important;border-color:#34d399!important}
+    .res-loss{background:rgba(239,68,68,.18)!important;color:#fca5a5!important;border-color:#fb7185!important}
+    .res-pending{background:rgba(59,130,246,.18)!important;color:#bfdbfe!important;border-color:#60a5fa!important}
     """
 
 
-def _apply_redesign_shell(html_text: str, variant: int) -> str:
-    inject = f"<style id=\"redesign-{variant}\">{_redesign_css(variant)}</style>"
+def _apply_preferred_theme(html_text: str) -> str:
+    inject = f"<style id=\"preferred-theme\">{_preferred_theme_css()}</style>"
+    if "<style id=\"preferred-theme\">" in html_text:
+        return re.sub(r'<style id="preferred-theme">.*?</style>', inject, html_text, flags=re.S)
     if "</head>" in html_text:
         return html_text.replace("</head>", inject + "\n</head>", 1)
     return html_text
 
 
-def _rewrite_links_for_redesign(html_text: str, variant: int) -> str:
-    prefix = f"/redesign/{variant}/"
-
-    # Keep asset links global (/assets, /data, etc.) but remap HTML route links to redesign folder.
-    html_text = re.sub(r'href="/(index\.html|dashboard\.html)"', lambda m: f'href="{prefix}{m.group(1)}"', html_text)
-    html_text = re.sub(r'href="/(\d{4}-\d{2}-\d{2}(?:-plus-money|-run-line|-run-totals)?\.html)"', lambda m: f'href="{prefix}{m.group(1)}"', html_text)
-    html_text = re.sub(r'src="/(\d{4}-\d{2}-\d{2}(?:-plus-money|-run-line|-run-totals)?\.html)(\?embed=1)?"', lambda m: f'src="{prefix}{m.group(1)}{m.group(2) or ""}"', html_text)
-    html_text = re.sub(r'href="/"', f'href="{prefix}index.html"', html_text)
-    return html_text
-
-
-def _write_redesign_variants(site_repo: Path, parsed_date: str, archive: list):
+def _apply_preferred_theme_files(site_repo: Path, parsed_date: str):
     files = [
         f"{parsed_date}.html",
         f"{parsed_date}-plus-money.html",
@@ -2109,18 +2068,14 @@ def _write_redesign_variants(site_repo: Path, parsed_date: str, archive: list):
         "index.html",
         "dashboard.html",
     ]
-
-    for variant in (1, 2, 3):
-        base = site_repo / "redesign" / str(variant)
-        base.mkdir(parents=True, exist_ok=True)
-        for name in files:
-            src = site_repo / name
-            if not src.exists():
-                continue
-            raw = src.read_text(encoding="utf-8", errors="ignore")
-            remapped = _rewrite_links_for_redesign(raw, variant)
-            styled = _apply_redesign_shell(remapped, variant)
-            (base / name).write_text(styled, encoding="utf-8")
+    for name in files:
+        p = site_repo / name
+        if not p.exists():
+            continue
+        raw = p.read_text(encoding="utf-8", errors="ignore")
+        themed = _apply_preferred_theme(raw)
+        if themed != raw:
+            p.write_text(themed, encoding="utf-8")
 
 
 def publish_daily_site(markdown_path: str, site_repo_path: str = None):
@@ -2178,8 +2133,8 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     (site_repo / 'robots.txt').write_text(_render_robots_txt())
     (site_repo / 'sitemap.xml').write_text(_render_sitemap_xml(archive))
 
-    # Generate alternate redesign outputs under /redesign/{1,2,3}/
-    _write_redesign_variants(site_repo, parsed['date'], archive)
+    # Apply preferred visual theme (formerly redesign 2) to primary pages.
+    _apply_preferred_theme_files(site_repo, parsed['date'])
 
     auto_publish = os.environ.get('AUTO_PUBLISH_SITE', 'true').lower() in ('1', 'true', 'yes', 'on')
     if not auto_publish:
@@ -2189,10 +2144,7 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     add = _run([
         'git', 'add', 'index.html', 'dashboard.html', 'data/performance-history.json',
         'media-kit.html', 'rate-card.html', 'robots.txt', 'sitemap.xml',
-        f"{parsed['date']}.html", f"{parsed['date']}-plus-money.html", f"{parsed['date']}-run-line.html", f"{parsed['date']}-run-totals.html",
-        f"redesign/1/{parsed['date']}.html", f"redesign/1/{parsed['date']}-plus-money.html", f"redesign/1/{parsed['date']}-run-line.html", f"redesign/1/{parsed['date']}-run-totals.html", "redesign/1/index.html", "redesign/1/dashboard.html",
-        f"redesign/2/{parsed['date']}.html", f"redesign/2/{parsed['date']}-plus-money.html", f"redesign/2/{parsed['date']}-run-line.html", f"redesign/2/{parsed['date']}-run-totals.html", "redesign/2/index.html", "redesign/2/dashboard.html",
-        f"redesign/3/{parsed['date']}.html", f"redesign/3/{parsed['date']}-plus-money.html", f"redesign/3/{parsed['date']}-run-line.html", f"redesign/3/{parsed['date']}-run-totals.html", "redesign/3/index.html", "redesign/3/dashboard.html"
+        f"{parsed['date']}.html", f"{parsed['date']}-plus-money.html", f"{parsed['date']}-run-line.html", f"{parsed['date']}-run-totals.html"
     ], site_repo)
     if add.returncode != 0:
         print(add.stderr.strip())
