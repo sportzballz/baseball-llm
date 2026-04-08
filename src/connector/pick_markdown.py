@@ -7,6 +7,7 @@ import requests
 import statsapi
 
 from common.util import get_teams_list
+from connector.matchup_metrics import get_metric_for_game, load_cached_metrics
 from connector.mlbstartinglineups import get_starting_lineups
 
 RECENT_LINEUP_GAMES = 5
@@ -410,6 +411,9 @@ def _fallback_commentary(context):
     )
     lineup_impact = context.get("lineup_change_impact", "")
     lineup_impact_sentence = f" {lineup_impact}" if lineup_impact else ""
+    metrics_summary = context.get("metrics_summary_text", "")
+    if metrics_summary:
+        lineup_impact_sentence += f" Metrics context: {metrics_summary}"
     style = context.get("style", "market maker")
     analyst_name = context.get("analyst_name")
     analyst_title = context.get("analyst_title")
@@ -587,6 +591,64 @@ def _generate_commentary(context):
     return _fallback_commentary(context)
 
 
+def _metrics_summary_for_commentary(metric, winner_name, loser_name):
+    if not metric:
+        return ""
+
+    home = ((metric.get("home") or {}).get("name") or "")
+    away = ((metric.get("away") or {}).get("name") or "")
+    winner_is_home = str(winner_name).strip().lower() == str(home).strip().lower()
+
+    bits = []
+
+    market = metric.get("market") or {}
+    implied_home = market.get("implied_home_prob")
+    if isinstance(implied_home, (int, float)):
+        implied_winner = implied_home if winner_is_home else (1 - implied_home)
+        if implied_winner >= 0.56:
+            bits.append("pricing context leans clearly toward this side")
+        elif implied_winner >= 0.52:
+            bits.append("pricing context gives a modest edge")
+        else:
+            bits.append("pricing context is closer to balanced")
+
+    consensus = market.get("consensus") or {}
+    rng = consensus.get("moneyline_range")
+    books = consensus.get("books")
+    if isinstance(books, (int, float)) and books >= 4 and isinstance(rng, (int, float)):
+        if rng <= 12:
+            bits.append("books are tightly aligned")
+        elif rng >= 30:
+            bits.append("books show wider disagreement")
+
+    bullpen = metric.get("bullpen") or {}
+    bp_edge = str(bullpen.get("edge") or "").lower()
+    if bp_edge == "home_fresher":
+        bits.append("bullpen freshness favors the home side" if winner_is_home else "bullpen freshness leans against this side")
+    elif bp_edge == "away_fresher":
+        bits.append("bullpen freshness favors the away side" if not winner_is_home else "bullpen freshness leans against this side")
+
+    lineups = metric.get("lineups") or {}
+    platoon_edge = str(lineups.get("platoon_edge") or "").lower()
+    if platoon_edge == "home":
+        bits.append("lineup handedness setup favors home" if winner_is_home else "lineup handedness setup favors away")
+    elif platoon_edge == "away":
+        bits.append("lineup handedness setup favors away" if not winner_is_home else "lineup handedness setup favors home")
+
+    park = metric.get("park_factors") or {}
+    run_factor = park.get("run_factor")
+    if isinstance(run_factor, (int, float)):
+        if run_factor >= 1.08:
+            bits.append("park environment can amplify scoring swings")
+        elif run_factor <= 0.94:
+            bits.append("park environment tends to suppress run volume")
+
+    if not bits:
+        return "Expanded matchup metrics were neutral."
+
+    return "; ".join(bits[:3]).capitalize() + "."
+
+
 def write_daily_pick_markdown(predictions, odds_data, model_name):
     valid = [p for p in predictions if p.winning_team != "-"]
     if not valid:
@@ -594,6 +656,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
 
     eastern = pytz.timezone("US/Eastern")
     today = str(datetime.now(eastern).date())
+    metrics_index = load_cached_metrics(today)
 
     abbr_to_name, name_to_id = _get_team_maps()
     schedule = _build_schedule_lookup(today)
@@ -640,6 +703,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
 
         game = _find_game_for_pick(schedule, winner_name, loser_name)
         game_data = statsapi.get("game", {"gamePk": game["game_id"]}) if game else {}
+        metric = get_metric_for_game(metrics_index, game_data) if game_data else None
 
         weather = (
             _extract_weather(game_data)
@@ -735,6 +799,9 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             "winner_lineup_trend": winner_lineup_impact,
             "loser_lineup_trend": loser_lineup_impact,
             "lineup_change_impact": lineup_change_impact,
+            "metrics_summary_text": _metrics_summary_for_commentary(
+                metric, winner_name, loser_name
+            ),
             "winning_pitcher": p.winning_pitcher,
             "losing_pitcher": p.losing_pitcher,
             "model_name": model_name,
