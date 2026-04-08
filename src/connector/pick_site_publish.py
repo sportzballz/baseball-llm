@@ -117,7 +117,7 @@ def _render_media_kit():
     </section>
     <section class="card"><h2>Audience & Format</h2><ul><li>MLB bettors seeking daily picks with structured context</li><li>Underdog/plus-money focused readers</li><li>Users who value transparent performance tracking</li></ul></section>
     <section class="card"><h2>Sponsorship Inventory</h2><ul><li>Homepage hero sponsor</li><li>Daily picks page sponsored placement</li><li>Plus money page sponsor</li><li>Run totals page sponsor</li><li>Dashboard sponsor</li></ul></section>
-    <section class="card"><h2>Contact</h2><p>To sponsor SportzBallz, contact: <strong>ads@sportzballz.io</strong> (update as needed).</p></section>
+    <section class="card"><h2>Contact</h2><p>To sponsor SportzBallz, contact: <strong>info@sportzballz.io</strong>.</p></section>
   </main>
   {_embed_mode_script()}
 </body>
@@ -203,7 +203,7 @@ def _render_contact_page():
     <section class="card">
       <h1>Contact SportzBallz</h1>
       <p class="muted">Questions, feedback, sponsorships, or collaboration ideas — send a note and we’ll get back to you.</p>
-      <p><strong>Email:</strong> <a href="mailto:ads@sportzballz.io?subject=SportzBallz%20Inquiry" style="color:#9fe7ff">ads@sportzballz.io</a></p>
+      <p><strong>Email:</strong> <a href="mailto:info@sportzballz.io?subject=SportzBallz%20Inquiry" style="color:#9fe7ff">info@sportzballz.io</a></p>
     </section>
 
     <section class="card">
@@ -231,7 +231,7 @@ def _render_contact_page():
       const msg = document.getElementById('message').value.trim();
       const subject = encodeURIComponent(`SportzBallz Contact: ${{topic}}`);
       const body = encodeURIComponent(`Name: ${{name}}\nEmail: ${{email}}\nTopic: ${{topic}}\n\nMessage:\n${{msg}}`);
-      window.location.href = `mailto:ads@sportzballz.io?subject=${{subject}}&body=${{body}}`;
+      window.location.href = `mailto:info@sportzballz.io?subject=${{subject}}&body=${{body}}`;
     }});
   </script>
   {_embed_mode_script()}
