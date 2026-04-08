@@ -171,22 +171,22 @@ def _render_rate_card():
 
 def _toolbar_css():
     return '''
-    .nav-toolbar { margin-top:12px; display:grid; grid-template-columns:1.2fr 1.4fr .8fr; gap:10px; align-items:start; }
-    .toolbar-group { border:1px solid #304b87; border-radius:10px; padding:10px; background:rgba(255,255,255,.03); min-height:58px; display:flex; flex-direction:column; justify-content:flex-start; }
-    .toolbar-group summary { cursor:pointer; color:#dff0ff; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; list-style:none; text-align:center; border:1px solid #3f61a0; border-radius:10px; padding:10px 12px; background:linear-gradient(135deg, rgba(99,210,255,.18), rgba(124,255,199,.10)); }
+    .nav-toolbar { margin:14px 0 18px; display:grid; grid-template-columns:1fr 1.25fr 1fr; gap:10px; align-items:start; }
+    .toolbar-group { border:1px solid #2d446f; border-radius:12px; padding:10px; background:#0f1a30; min-height:56px; display:flex; flex-direction:column; justify-content:flex-start; }
+    .toolbar-group summary { cursor:pointer; color:#e6efff; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; list-style:none; text-align:center; border:1px solid #375486; border-radius:10px; padding:10px 12px; background:#132241; }
     .toolbar-group summary::-webkit-details-marker { display:none; }
     .toolbar-group[open] summary { margin-bottom:8px; }
-    .toolbar-group summary a { color:#dff0ff; text-decoration:none; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
+    .toolbar-group summary a { color:#e6efff; text-decoration:none; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
     .nav-toolbar > .toolbar-group > summary { min-height:44px; display:flex; align-items:center; justify-content:center; }
     .toolbar-links { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
-    .toolbar-links a { color:#dfeeff; text-decoration:none; border:1px solid #3b5a95; border-radius:8px; padding:7px 10px; font-size:13px; background:rgba(255,255,255,.02); }
+    .toolbar-links a { color:#e7f0ff; text-decoration:none; border:1px solid #355184; border-radius:8px; padding:8px 10px; font-size:13px; background:#12203d; }
     .toolbar-links a:hover { border-color:var(--accent, #63d2ff); }
-    .archive-group { border:1px solid #304b87; border-radius:10px; padding:10px 12px; background:rgba(255,255,255,.02); margin-bottom:10px; }
+    .archive-group { border:1px solid #2d446f; border-radius:10px; padding:10px 12px; background:#101c34; margin-bottom:10px; }
     .archive-group summary { cursor:pointer; font-weight:700; color:#dfeeff; }
     .archive-links { margin-top:10px; display:grid; gap:8px; }
-    .archive-links a { color:var(--ink, #ebf1ff); text-decoration:none; border:1px solid #3b5a95; border-radius:8px; padding:8px 10px; background:rgba(255,255,255,.02); }
+    .archive-links a { color:var(--ink, #ebf1ff); text-decoration:none; border:1px solid #355184; border-radius:8px; padding:8px 10px; background:#12203d; }
     .archive-links a:hover { border-color:var(--accent, #63d2ff); }
-    .pill { font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:#dff4ff; background:rgba(99,210,255,.18); border:1px solid rgba(99,210,255,.35); border-radius:999px; padding:3px 7px; white-space:nowrap; }
+    .pill { font-size:11px; letter-spacing:.09em; text-transform:uppercase; color:#dff4ff; background:#1b3d67; border:1px solid #2f679f; border-radius:999px; padding:3px 7px; white-space:nowrap; }
     @media (max-width:1100px) { .nav-toolbar { grid-template-columns:1fr; } }
 '''
 
@@ -1007,7 +1007,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#5cc9ff; --accent2:#88f2c7; }}
     *{{box-sizing:border-box}}
-    body{{margin:0;font-family:Georgia,'Times New Roman',serif;background:radial-gradient(1200px 700px at 15% -10%, #1a2a55, var(--bg));color:var(--ink);line-height:1.65}}
+    body{{margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg, #0b1220 0%, #0a1020 100%);color:var(--ink);line-height:1.65}}
     .wrap{{max-width:1100px;margin:0 auto;padding:24px 16px 48px}}
     header{{background:linear-gradient(135deg, rgba(92,201,255,.18), rgba(136,242,199,.09));border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:16px}}
     .kicker{{font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}}
@@ -1018,8 +1018,8 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     .ad-copy{{color:#d9e6ff;font:500 14px/1.3 Inter,system-ui,sans-serif}}
     .ad-cta{{display:inline-block;padding:7px 10px;border-radius:8px;border:1px solid #4c6db0;color:#dff2ff;text-decoration:none;font:600 12px Inter,system-ui,sans-serif}}
     {_toolbar_css()}
-    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 12px 28px rgba(0,0,0,.24)}}
-    .pick-head h2{{margin:4px 0 8px;font-size:30px;line-height:1.15}}
+    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 8px 22px rgba(2,8,24,.32)}}
+    .pick-head h2{{margin:4px 0 8px;font-size:27px;line-height:1.15}}
     .seo-line{{font:600 12px/1.3 Inter,system-ui,sans-serif;color:#a9c6ff;letter-spacing:.02em;margin-top:2px}}
     .pick-head{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
     .pick-num{{font:600 12px/1 Inter,system-ui,sans-serif;color:var(--accent);letter-spacing:.12em;text-transform:uppercase}}
@@ -1036,7 +1036,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     .meta-grid div{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
     .meta-grid span{{display:block;color:var(--muted);font:600 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}}
     .meta-grid strong{{font:600 15px/1.35 Inter,system-ui,sans-serif;color:#dce8ff}}
-    .lede{{font-size:20px;margin:12px 0 8px;color:#f2f6ff}}
+    .lede{{font-size:18px;line-height:1.55;margin:12px 0 8px;color:#f2f6ff}}
     details{{margin-top:8px;border-top:1px solid #264377;padding-top:8px}}
     summary{{cursor:pointer;font:600 14px Inter,system-ui,sans-serif;color:var(--accent)}}
     ul{{margin:10px 0 0 18px;padding:0}}
@@ -1167,7 +1167,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#5cc9ff; --accent2:#88f2c7; --plus:#22c55e; }}
     *{{box-sizing:border-box}}
-    body{{margin:0;font-family:Georgia,'Times New Roman',serif;background:radial-gradient(1200px 700px at 15% -10%, #1a2a55, var(--bg));color:var(--ink);line-height:1.65}}
+    body{{margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg, #0b1220 0%, #0a1020 100%);color:var(--ink);line-height:1.65}}
     .wrap{{max-width:1100px;margin:0 auto;padding:24px 16px 48px}}
     header{{background:linear-gradient(135deg, rgba(34,197,94,.20), rgba(92,201,255,.10));border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:16px}}
     .kicker{{font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}}
@@ -1177,8 +1177,8 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     .ad-label{{font:700 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#9cc4ff}}
     .ad-copy{{color:#d9e6ff;font:500 14px/1.3 Inter,system-ui,sans-serif}}
     .ad-cta{{display:inline-block;padding:7px 10px;border-radius:8px;border:1px solid #4c6db0;color:#dff2ff;text-decoration:none;font:600 12px Inter,system-ui,sans-serif}}
-    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 12px 28px rgba(0,0,0,.24)}}
-    .pick-head h2{{margin:4px 0 8px;font-size:30px;line-height:1.15}}
+    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 8px 22px rgba(2,8,24,.32)}}
+    .pick-head h2{{margin:4px 0 8px;font-size:27px;line-height:1.15}}
     .seo-line{{font:600 12px/1.3 Inter,system-ui,sans-serif;color:#a9c6ff;letter-spacing:.02em;margin-top:2px}}
     .pick-head{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
     {_toolbar_css()}
@@ -1196,7 +1196,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     .meta-grid div{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
     .meta-grid span{{display:block;color:var(--muted);font:600 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}}
     .meta-grid strong{{font:600 15px/1.35 Inter,system-ui,sans-serif;color:#dce8ff}}
-    .lede{{font-size:20px;margin:12px 0 8px;color:#f2f6ff}}
+    .lede{{font-size:18px;line-height:1.55;margin:12px 0 8px;color:#f2f6ff}}
     details{{margin-top:8px;border-top:1px solid #264377;padding-top:8px}}
     summary{{cursor:pointer;font:600 14px Inter,system-ui,sans-serif;color:var(--accent)}}
     ul{{margin:10px 0 0 18px;padding:0}}
@@ -1295,7 +1295,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#f59e0b; --accent2:#5cc9ff; }}
     *{{box-sizing:border-box}}
-    body{{margin:0;font-family:Georgia,'Times New Roman',serif;background:radial-gradient(1200px 700px at 15% -10%, #1a2a55, var(--bg));color:var(--ink);line-height:1.65}}
+    body{{margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg, #0b1220 0%, #0a1020 100%);color:var(--ink);line-height:1.65}}
     .wrap{{max-width:1100px;margin:0 auto;padding:24px 16px 48px}}
     header{{background:linear-gradient(135deg, rgba(245,158,11,.20), rgba(92,201,255,.10));border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:16px}}
     .kicker{{font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}}
@@ -1305,8 +1305,8 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     .ad-label{{font:700 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#9cc4ff}}
     .ad-copy{{color:#d9e6ff;font:500 14px/1.3 Inter,system-ui,sans-serif}}
     .ad-cta{{display:inline-block;padding:7px 10px;border-radius:8px;border:1px solid #4c6db0;color:#dff2ff;text-decoration:none;font:600 12px Inter,system-ui,sans-serif}}
-    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 12px 28px rgba(0,0,0,.24)}}
-    .pick-head h2{{margin:4px 0 8px;font-size:30px;line-height:1.15}}
+    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 8px 22px rgba(2,8,24,.32)}}
+    .pick-head h2{{margin:4px 0 8px;font-size:27px;line-height:1.15}}
     .seo-line{{font:600 12px/1.3 Inter,system-ui,sans-serif;color:#a9c6ff;letter-spacing:.02em;margin-top:2px}}
     .pick-head{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
     .res{{display:inline-flex;align-items:center;justify-content:center;padding:5px 9px;border-radius:999px;border:1px solid #35518f;font:700 11px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#dce8ff;background:rgba(255,255,255,.04)}}
@@ -1318,7 +1318,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     .meta-grid div{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
     .meta-grid span{{display:block;color:var(--muted);font:600 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}}
     .meta-grid strong{{font:600 15px/1.35 Inter,system-ui,sans-serif;color:#dce8ff}}
-    .lede{{font-size:20px;margin:12px 0 8px;color:#f2f6ff}}
+    .lede{{font-size:18px;line-height:1.55;margin:12px 0 8px;color:#f2f6ff}}
     details{{margin-top:8px;border-top:1px solid #264377;padding-top:8px}}
     summary{{cursor:pointer;font:600 14px Inter,system-ui,sans-serif;color:#fbbf24}}
     ul{{margin:10px 0 0 18px;padding:0}}
@@ -1406,14 +1406,14 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#f97316; }}
     *{{box-sizing:border-box}}
-    body{{margin:0;font-family:Georgia,'Times New Roman',serif;background:radial-gradient(1200px 700px at 15% -10%, #1a2a55, var(--bg));color:var(--ink);line-height:1.65}}
+    body{{margin:0;font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:linear-gradient(180deg, #0b1220 0%, #0a1020 100%);color:var(--ink);line-height:1.65}}
     .wrap{{max-width:1100px;margin:0 auto;padding:24px 16px 48px}}
     header{{background:linear-gradient(135deg, rgba(249,115,22,.20), rgba(92,201,255,.10));border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:16px}}
     .kicker{{font:600 12px/1.2 Inter,system-ui,sans-serif;letter-spacing:.12em;color:var(--muted);text-transform:uppercase}}
     h1{{margin:8px 0 10px;font-size:clamp(30px,5vw,46px);line-height:1.05}}
     .sub{{color:var(--muted);font-family:Inter,system-ui,sans-serif;font-size:14px}}
-    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 12px 28px rgba(0,0,0,.24)}}
-    .pick-head h2{{margin:4px 0 8px;font-size:30px;line-height:1.15}}
+    .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 8px 22px rgba(2,8,24,.32)}}
+    .pick-head h2{{margin:4px 0 8px;font-size:27px;line-height:1.15}}
     .pick-head{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
     .pick-num{{font:600 12px/1 Inter,system-ui,sans-serif;color:var(--accent);letter-spacing:.12em;text-transform:uppercase}}
     .seo-line{{font:600 12px/1.3 Inter,system-ui,sans-serif;color:#a9c6ff;letter-spacing:.02em;margin-top:2px}}
@@ -1425,7 +1425,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     .meta-grid div{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
     .meta-grid span{{display:block;color:var(--muted);font:600 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}}
     .meta-grid strong{{font:600 15px/1.35 Inter,system-ui,sans-serif;color:#dce8ff}}
-    .lede{{font-size:20px;margin:12px 0 8px;color:#f2f6ff}}
+    .lede{{font-size:18px;line-height:1.55;margin:12px 0 8px;color:#f2f6ff}}
     {_toolbar_css()}
   </style>
 </head>
@@ -1921,7 +1921,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#5cc9ff; }}
     * {{ box-sizing:border-box; }}
-    body {{ margin:0; background:radial-gradient(1200px 700px at 15% -10%, #1a2a55, var(--bg)); color:var(--ink); font-family:Inter,system-ui,sans-serif; }}
+    body {{ margin:0; background:linear-gradient(180deg, #0b1220 0%, #0a1020 100%); color:var(--ink); font-family:Inter,system-ui,sans-serif; }}
     .wrap {{ max-width:1100px; margin:0 auto; padding:24px 16px 48px; }}
     .card {{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:14px; }}
     h1 {{ margin:0 0 8px; font-size:34px; }}
