@@ -213,7 +213,7 @@ def _render_global_toolbar(latest_date: str, archive_dates):
     return f'''
       <div class="nav-toolbar">
         <details class="toolbar-group">
-          <summary><a href="/">⚾ Latest Daily Picks</a></summary>
+          <summary><a href="/index.html">⚾ Latest Daily Picks</a></summary>
         </details>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
@@ -1201,8 +1201,6 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     summary{{cursor:pointer;font:600 14px Inter,system-ui,sans-serif;color:var(--accent)}}
     ul{{margin:10px 0 0 18px;padding:0}}
     li{{margin:6px 0}}
-    .toplinks{{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}}
-    .toplinks a{{display:inline-block;padding:8px 12px;border:1px solid #31508e;border-radius:9px;color:#dce8ff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-size:13px}}
     footer{{margin-top:10px;color:var(--muted);font:12px Inter,system-ui,sans-serif;text-align:right}}
     @media (max-width:720px){{.lede{{font-size:18px}} .pick-head h2{{font-size:24px}}}}
   </style>
@@ -1213,10 +1211,6 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
       <div class="kicker">SportzBallz Plus Money Desk</div>
       <h1>Plus Money Picks — {html.escape(date_str)}</h1>
       <div class="sub">Model: {html.escape(model)} • Updated {html.escape(now)}</div>
-      <div class="toplinks">
-        <a href="/{html.escape(date_str)}.html">Full Daily Picks</a>
-        <a href="/">Home</a>
-      </div>
     </header>
     {toolbar_html}
     {_render_ad_slot('plus-money-top', 'Plus Money Card Sponsorship')}
@@ -1329,8 +1323,6 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     summary{{cursor:pointer;font:600 14px Inter,system-ui,sans-serif;color:#fbbf24}}
     ul{{margin:10px 0 0 18px;padding:0}}
     li{{margin:6px 0}}
-    .toplinks{{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}}
-    .toplinks a{{display:inline-block;padding:8px 12px;border:1px solid #31508e;border-radius:9px;color:#dce8ff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-size:13px}}
     {_toolbar_css()}
     footer{{margin-top:10px;color:var(--muted);font:12px Inter,system-ui,sans-serif;text-align:right}}
   </style>
@@ -1341,11 +1333,6 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
       <div class="kicker">SportzBallz Totals Desk</div>
       <h1>Run Total Picks — {html.escape(date_str)}</h1>
       <div class="sub">Model: {html.escape(model)} • Updated {html.escape(now)}</div>
-      <div class="toplinks">
-        <a href="/{html.escape(date_str)}.html">Full Daily Picks</a>
-        <a href="/{html.escape(date_str)}-plus-money.html">Plus Money Picks</a>
-        <a href="/">Home</a>
-      </div>
     </header>
     {toolbar_html}
     {_render_ad_slot('run-totals-top', 'Run Totals Sponsorship')}
@@ -1439,8 +1426,6 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     .meta-grid span{{display:block;color:var(--muted);font:600 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}}
     .meta-grid strong{{font:600 15px/1.35 Inter,system-ui,sans-serif;color:#dce8ff}}
     .lede{{font-size:20px;margin:12px 0 8px;color:#f2f6ff}}
-    .toplinks{{display:flex;gap:10px;margin-top:10px;flex-wrap:wrap}}
-    .toplinks a{{display:inline-block;padding:8px 12px;border:1px solid #31508e;border-radius:9px;color:#dce8ff;text-decoration:none;font-family:Inter,system-ui,sans-serif;font-size:13px}}
     {_toolbar_css()}
   </style>
 </head>
@@ -1450,11 +1435,6 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
       <div class="kicker">SportzBallz Run Line Desk</div>
       <h1>Run Line Picks — {html.escape(date_str)}</h1>
       <div class="sub">Model: {html.escape(model)} • Updated {html.escape(now)}</div>
-      <div class="toplinks">
-        <a href="/{html.escape(date_str)}.html">Money Line</a>
-        <a href="/{html.escape(date_str)}-run-totals.html">Over / Under</a>
-        <a href="/">Home</a>
-      </div>
     </header>
     {toolbar_html}
     {''.join(cards)}
@@ -1687,7 +1667,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
 
       <div class="nav-toolbar">
         <details class="toolbar-group">
-          <summary><a href="/">⚾ Latest Daily Picks</a></summary>
+          <summary><a href="/index.html">⚾ Latest Daily Picks</a></summary>
         </details>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
