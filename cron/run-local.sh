@@ -79,12 +79,12 @@ RUN_LOG="$LOG_DIR/${MODEL}-$(date '+%Y-%m-%d').log"
 echo "[$TIMESTAMP] Starting model '$MODEL' with $PYTHON_BIN" >> "$RUN_LOG"
 (
   cd "$SRC_DIR"
+  # Local runs never push directly; OpenClaw polish/publish job owns final publish.
+  export AUTO_PUBLISH_SITE=false
+
   if [[ "$REFRESH_MATCHUP_METRICS" =~ ^(1|true|yes|on)$ ]]; then
     "$PYTHON_BIN" "$SRC_DIR/scripts/build_matchup_metrics.py" >> "$RUN_LOG" 2>&1 \
       || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Matchup metrics refresh failed (continuing)" >> "$RUN_LOG"
-  fi
-  if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
-    export AUTO_PUBLISH_SITE=false
   fi
   if [[ ! "$LOCAL_USE_LLM_FOR_INITIAL" =~ ^(1|true|yes|on)$ ]]; then
     # Force fallback commentary for local generation pass.
@@ -97,6 +97,10 @@ echo "[$TIMESTAMP] Starting model '$MODEL' with $PYTHON_BIN" >> "$RUN_LOG"
 EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Completed successfully" >> "$RUN_LOG"
+
+  # Also refresh yesterday pages so completed game results flow onto older pages.
+  "$PYTHON_BIN" "$SRC_DIR/scripts/refresh_yesterday_results.py" >> "$RUN_LOG" 2>&1 \
+    || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Yesterday results refresh failed (continuing)" >> "$RUN_LOG"
 
   if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
     if [[ -z "$BASEBALL_POLISH_CRON_ID" ]]; then
