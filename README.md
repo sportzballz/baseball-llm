@@ -143,3 +143,12 @@ The commentary includes (best effort):
 - Market consensus dispersion: books count, moneyline range/stddev, outlier-book count
 - Park factors: run factor and HR factor per venue (neutral fallback)
 - Lineup platoon edge: announced lineup handedness vs opposing probable pitcher throw hand
+
+### Weight tuning helper
+- Script: `src/scripts/tune_metric_weights.py`
+- Runs a quick grid sweep against finalized cached-metric games and prints recommended values for:
+  - `METRIC_WEIGHT_MARKET`
+  - `METRIC_WEIGHT_PITCHING`
+  - `METRIC_WEIGHT_OFFENSE`
+  - `METRIC_WEIGHT_BULLPEN`
+  - `METRIC_WEIGHT_CONTEXT`
