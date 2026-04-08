@@ -2032,6 +2032,73 @@ def _run(cmd, cwd):
     return subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True)
 
 
+def _redesign_css(variant: int) -> str:
+    if variant == 1:
+        return """
+        body{background:#0a0f1a!important}
+        .wrap{max-width:1200px!important}
+        .pick-card,.card{border-radius:10px!important;border-color:#2f3f62!important;background:#0f1728!important}
+        h1,h2{letter-spacing:.01em}
+        .lede{font-size:17px!important;line-height:1.62!important}
+        """
+    if variant == 2:
+        return """
+        body{background:#0d1117!important}
+        .wrap{max-width:1280px!important}
+        .pick-card,.card{border-radius:16px!important;border-color:#2c466f!important;background:linear-gradient(180deg,#111b31,#0f182c)!important;box-shadow:0 14px 30px rgba(0,0,0,.28)!important}
+        .meta-grid div{background:rgba(255,255,255,.035)!important}
+        .lede{font-size:18px!important;line-height:1.66!important}
+        """
+    return """
+    body{background:#0b1324!important}
+    .wrap{max-width:1100px!important}
+    .pick-card,.card{border-radius:8px!important;border-color:#31476d!important;background:#101b30!important;box-shadow:none!important}
+    .meta-grid div{border-style:solid!important}
+    .lede{font-size:16px!important;line-height:1.58!important}
+    """
+
+
+def _apply_redesign_shell(html_text: str, variant: int) -> str:
+    inject = f"<style id=\"redesign-{variant}\">{_redesign_css(variant)}</style>"
+    if "</head>" in html_text:
+        return html_text.replace("</head>", inject + "\n</head>", 1)
+    return html_text
+
+
+def _rewrite_links_for_redesign(html_text: str, variant: int) -> str:
+    prefix = f"/redesign/{variant}/"
+
+    # Keep asset links global (/assets, /data, etc.) but remap HTML route links to redesign folder.
+    html_text = re.sub(r'href="/(index\.html|dashboard\.html)"', lambda m: f'href="{prefix}{m.group(1)}"', html_text)
+    html_text = re.sub(r'href="/(\d{4}-\d{2}-\d{2}(?:-plus-money|-run-line|-run-totals)?\.html)"', lambda m: f'href="{prefix}{m.group(1)}"', html_text)
+    html_text = re.sub(r'src="/(\d{4}-\d{2}-\d{2}(?:-plus-money|-run-line|-run-totals)?\.html)(\?embed=1)?"', lambda m: f'src="{prefix}{m.group(1)}{m.group(2) or ""}"', html_text)
+    html_text = re.sub(r'href="/"', f'href="{prefix}index.html"', html_text)
+    return html_text
+
+
+def _write_redesign_variants(site_repo: Path, parsed_date: str, archive: list):
+    files = [
+        f"{parsed_date}.html",
+        f"{parsed_date}-plus-money.html",
+        f"{parsed_date}-run-line.html",
+        f"{parsed_date}-run-totals.html",
+        "index.html",
+        "dashboard.html",
+    ]
+
+    for variant in (1, 2, 3):
+        base = site_repo / "redesign" / str(variant)
+        base.mkdir(parents=True, exist_ok=True)
+        for name in files:
+            src = site_repo / name
+            if not src.exists():
+                continue
+            raw = src.read_text(encoding="utf-8", errors="ignore")
+            remapped = _rewrite_links_for_redesign(raw, variant)
+            styled = _apply_redesign_shell(remapped, variant)
+            (base / name).write_text(styled, encoding="utf-8")
+
+
 def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     md_file = Path(markdown_path)
     if not md_file.exists():
@@ -2087,6 +2154,9 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     (site_repo / 'robots.txt').write_text(_render_robots_txt())
     (site_repo / 'sitemap.xml').write_text(_render_sitemap_xml(archive))
 
+    # Generate alternate redesign outputs under /redesign/{1,2,3}/
+    _write_redesign_variants(site_repo, parsed['date'], archive)
+
     auto_publish = os.environ.get('AUTO_PUBLISH_SITE', 'true').lower() in ('1', 'true', 'yes', 'on')
     if not auto_publish:
         return str(date_html)
@@ -2095,7 +2165,10 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     add = _run([
         'git', 'add', 'index.html', 'dashboard.html', 'data/performance-history.json',
         'media-kit.html', 'rate-card.html', 'robots.txt', 'sitemap.xml',
-        f"{parsed['date']}.html", f"{parsed['date']}-plus-money.html", f"{parsed['date']}-run-line.html", f"{parsed['date']}-run-totals.html"
+        f"{parsed['date']}.html", f"{parsed['date']}-plus-money.html", f"{parsed['date']}-run-line.html", f"{parsed['date']}-run-totals.html",
+        f"redesign/1/{parsed['date']}.html", f"redesign/1/{parsed['date']}-plus-money.html", f"redesign/1/{parsed['date']}-run-line.html", f"redesign/1/{parsed['date']}-run-totals.html", "redesign/1/index.html", "redesign/1/dashboard.html",
+        f"redesign/2/{parsed['date']}.html", f"redesign/2/{parsed['date']}-plus-money.html", f"redesign/2/{parsed['date']}-run-line.html", f"redesign/2/{parsed['date']}-run-totals.html", "redesign/2/index.html", "redesign/2/dashboard.html",
+        f"redesign/3/{parsed['date']}.html", f"redesign/3/{parsed['date']}-plus-money.html", f"redesign/3/{parsed['date']}-run-line.html", f"redesign/3/{parsed['date']}-run-totals.html", "redesign/3/index.html", "redesign/3/dashboard.html"
     ], site_repo)
     if add.returncode != 0:
         print(add.stderr.strip())
