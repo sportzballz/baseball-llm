@@ -57,6 +57,7 @@ def _render_sitemap_xml(archive_dates):
         _site_url('/dashboard.html'),
         _site_url('/media-kit.html'),
         _site_url('/rate-card.html'),
+        _site_url('/contact.html'),
     ]
 
     for d in sorted(set(archive_dates), reverse=True):
@@ -152,7 +153,7 @@ def _render_rate_card():
     <section class="card">
       <h1>SportzBallz Rate Card</h1>
       <p class="muted">Starter pricing — tune as traffic and conversion data matures.</p>
-      <a class="btn" href="/media-kit.html">Media Kit</a><a class="btn" href="/">Homepage</a>
+      <a class="btn" href="/media-kit.html">Media Kit</a><a class="btn" href="/contact.html">Contact</a><a class="btn" href="/">Homepage</a>
     </section>
     <section class="card">
       <table><thead><tr><th>Placement</th><th>Pricing</th><th>Notes</th></tr></thead><tbody>
@@ -165,6 +166,74 @@ def _render_rate_card():
       </tbody></table>
     </section>
   </main>
+  {_embed_mode_script()}
+</body>
+</html>
+'''
+
+
+def _render_contact_page():
+    return f'''<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <title>SportzBallz | Contact</title>
+  <meta name="description" content="Contact SportzBallz for partnerships, feedback, picks questions, and sponsorship inquiries." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="{_site_url('/contact.html')}" />
+  <style>
+    :root {{ --bg:#060b17; --panel:#0b1328; --ink:#e6f1ff; --muted:#93a7cc; --line:#28436d; --accent:#00d1ff; --accent2:#7cff7a; }}
+    * {{ box-sizing:border-box; }}
+    body {{ margin:0; background:radial-gradient(1200px 700px at 80% -10%, #1b3a7a 0%, transparent 55%), radial-gradient(900px 600px at 0% 0%, #0b4f66 0%, transparent 45%), #050a14; color:var(--ink); font-family:Inter,system-ui,sans-serif; }}
+    .wrap {{ max-width:920px; margin:0 auto; padding:24px 16px 56px; }}
+    .card {{ background:linear-gradient(180deg,#0a142a,#0b1730); border:1px solid #2d4f86; border-radius:16px; padding:18px; margin-bottom:14px; }}
+    h1 {{ margin:0 0 8px; }}
+    .muted {{ color:var(--muted); }}
+    label {{ display:block; margin:10px 0 6px; font-size:13px; color:#cfe0ff; }}
+    input, textarea {{ width:100%; border:1px solid #355b92; border-radius:10px; background:#0d1930; color:#edf5ff; padding:10px 12px; font:inherit; }}
+    textarea {{ min-height:140px; resize:vertical; }}
+    .row {{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }}
+    .btn {{ display:inline-block; margin-right:8px; margin-top:12px; padding:9px 13px; border-radius:10px; text-decoration:none; color:#081224; background:linear-gradient(90deg,var(--accent),var(--accent2)); font-weight:700; border:none; cursor:pointer; }}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="card">
+      <h1>Contact SportzBallz</h1>
+      <p class="muted">Questions, feedback, sponsorships, or collaboration ideas — send a note and we’ll get back to you.</p>
+      <p><strong>Email:</strong> <a href="mailto:ads@sportzballz.io?subject=SportzBallz%20Inquiry" style="color:#9fe7ff">ads@sportzballz.io</a></p>
+    </section>
+
+    <section class="card">
+      <h2 style="margin-top:0">Quick message</h2>
+      <form id="contactForm">
+        <div class="row">
+          <div><label for="name">Name</label><input id="name" required /></div>
+          <div><label for="email">Email</label><input id="email" type="email" required /></div>
+        </div>
+        <label for="topic">Topic</label><input id="topic" placeholder="Sponsorship / Feedback / Picks Question" />
+        <label for="message">Message</label><textarea id="message" required></textarea>
+        <button class="btn" type="submit">Open Email Draft</button>
+        <a class="btn" href="/">Back to Homepage</a>
+      </form>
+      <p class="muted" style="margin-top:10px">This form opens your email app with a prefilled message.</p>
+    </section>
+  </main>
+
+  <script>
+    document.getElementById('contactForm')?.addEventListener('submit', (e) => {{
+      e.preventDefault();
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const topic = document.getElementById('topic').value.trim() || 'General Inquiry';
+      const msg = document.getElementById('message').value.trim();
+      const subject = encodeURIComponent(`SportzBallz Contact: ${{topic}}`);
+      const body = encodeURIComponent(`Name: ${{name}}\nEmail: ${{email}}\nTopic: ${{topic}}\n\nMessage:\n${{msg}}`);
+      window.location.href = `mailto:ads@sportzballz.io?subject=${{subject}}&body=${{body}}`;
+    }});
+  </script>
   {_embed_mode_script()}
 </body>
 </html>
@@ -1723,7 +1792,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
 
     <footer>
       <span>© SportzBallz.io</span>
-      <span class="footer-links"><a href="/media-kit.html">Media Kit</a><a href="/rate-card.html">Rate Card</a></span>
+      <span class="footer-links"><a href="/media-kit.html">Media Kit</a><a href="/rate-card.html">Rate Card</a><a href="/contact.html">Contact</a></span>
     </footer>
   </main>
   <script>
@@ -1991,7 +2060,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     <div class="card">
       <h1>Performance Dashboard</h1>
       <div class="meta">Auto-tracked from published daily picks. Assumption: flat <strong>$100 stake</strong> on each decided pick in each strategy bucket.</div>
-      <div class="links"><a href="/">Home</a> <a href="/media-kit.html">Media Kit</a> <a href="/rate-card.html">Rate Card</a></div>
+      <div class="links"><a href="/">Home</a> <a href="/media-kit.html">Media Kit</a> <a href="/rate-card.html">Rate Card</a> <a href="/contact.html">Contact</a></div>
       {_render_ad_slot('dashboard-top', 'Dashboard Sponsorship')}
       <div class="grid">
         <div class="k"><span>Total Picks Logged</span><strong>{all_total['total']}</strong></div>
@@ -2128,6 +2197,7 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     (site_repo / 'dashboard.html').write_text(_render_dashboard(history, latest_global, archive))
     (site_repo / 'media-kit.html').write_text(_render_media_kit())
     (site_repo / 'rate-card.html').write_text(_render_rate_card())
+    (site_repo / 'contact.html').write_text(_render_contact_page())
 
     (site_repo / 'index.html').write_text(_render_top_index(parsed['date'], archive, evaluated_picks, frozen_commentary))
     (site_repo / 'robots.txt').write_text(_render_robots_txt())
@@ -2143,7 +2213,7 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     # Commit + push any changes
     add = _run([
         'git', 'add', 'index.html', 'dashboard.html', 'data/performance-history.json',
-        'media-kit.html', 'rate-card.html', 'robots.txt', 'sitemap.xml',
+        'media-kit.html', 'rate-card.html', 'contact.html', 'robots.txt', 'sitemap.xml',
         f"{parsed['date']}.html", f"{parsed['date']}-plus-money.html", f"{parsed['date']}-run-line.html", f"{parsed['date']}-run-totals.html"
     ], site_repo)
     if add.returncode != 0:
