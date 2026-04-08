@@ -118,6 +118,7 @@ def _render_media_kit():
     <section class="card"><h2>Sponsorship Inventory</h2><ul><li>Homepage hero sponsor</li><li>Daily picks page sponsored placement</li><li>Plus money page sponsor</li><li>Run totals page sponsor</li><li>Dashboard sponsor</li></ul></section>
     <section class="card"><h2>Contact</h2><p>To sponsor SportzBallz, contact: <strong>ads@sportzballz.io</strong> (update as needed).</p></section>
   </main>
+  {_embed_mode_script()}
 </body>
 </html>
 '''
@@ -164,6 +165,7 @@ def _render_rate_card():
       </tbody></table>
     </section>
   </main>
+  {_embed_mode_script()}
 </body>
 </html>
 '''
@@ -224,6 +226,21 @@ def _render_global_toolbar(latest_date: str, archive_dates):
         </details>
       </div>
     '''
+
+
+def _embed_mode_script():
+    return '''
+  <script>
+    (() => {
+      try {
+        const params = new URLSearchParams(window.location.search || '');
+        if (params.get('embed') === '1') {
+          document.querySelectorAll('.nav-toolbar').forEach((el) => el.remove());
+        }
+      } catch (_e) {}
+    })();
+  </script>
+'''
 
 
 def _parse_confidence(conf_text: str):
@@ -1058,6 +1075,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     {''.join(cards)}
     <footer>Published by SportzBallz.io</footer>
   </main>
+  {_embed_mode_script()}
 </body>
 </html>
 '''
@@ -1218,6 +1236,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     {''.join(cards)}
     <footer>Published by SportzBallz.io</footer>
   </main>
+  {_embed_mode_script()}
 </body>
 </html>
 '''
@@ -1339,6 +1358,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     {''.join(cards)}
     <footer>Published by SportzBallz.io</footer>
   </main>
+  {_embed_mode_script()}
 </body>
 </html>
 '''
@@ -1439,6 +1459,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     {toolbar_html}
     {''.join(cards)}
   </main>
+  {_embed_mode_script()}
 </body>
 </html>
 '''
@@ -1687,13 +1708,13 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         </div>
 
         <section id="panel-daily" class="pick-panel active" role="tabpanel">
-          <iframe class="pick-embed" src="{latest_href}" title="Daily Picks"></iframe>
+          <iframe class="pick-embed" src="{latest_href}?embed=1" title="Daily Picks"></iframe>
         </section>
         <section id="panel-plus" class="pick-panel" role="tabpanel">
-          <iframe class="pick-embed" src="{latest_plus_href}" title="Plus Money Picks"></iframe>
+          <iframe class="pick-embed" src="{latest_plus_href}?embed=1" title="Plus Money Picks"></iframe>
         </section>
         <section id="panel-totals" class="pick-panel" role="tabpanel">
-          <iframe class="pick-embed" src="{latest_totals_href}" title="Run Total Picks"></iframe>
+          <iframe class="pick-embed" src="{latest_totals_href}?embed=1" title="Run Total Picks"></iframe>
         </section>
         {_render_ad_slot('index-hero', 'Homepage Sponsorship')}
       </article>
@@ -2001,6 +2022,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
       </table>
     </div>
   </main>
+  {_embed_mode_script()}
 </body>
 </html>
 '''
