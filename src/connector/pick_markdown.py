@@ -1,5 +1,6 @@
 import json
 import os
+import random
 from datetime import datetime, timedelta
 
 import pytz
@@ -260,6 +261,38 @@ def _format_odds(odds):
     return "----"
 
 
+def _signal_sentiment(signal_text: str, positive: bool = True) -> str:
+    s = str(signal_text or "").lower()
+    if not s or s == "no model signal list available.":
+        return "model signal context was limited"
+
+    offense = any(k in s for k in ["runs", "homer", "rbi", "avg", "hits", "doubles", "triples", "walk"])
+    pitching = any(k in s for k in ["whip", "era", "strikeout", "walksper9", "hitsper9", "homerunsper9", "strikepercentage"])
+    matchup = ("opposing pitcher" in s) or ("opposing team" in s)
+    form = "most wins" in s
+
+    parts = []
+    if offense:
+        parts.append("run creation quality")
+    if pitching:
+        parts.append("run prevention stability")
+    if matchup:
+        parts.append("matchup history leverage")
+    if form:
+        parts.append("recent form")
+
+    if not parts:
+        core = "overall matchup profile"
+    elif len(parts) == 1:
+        core = parts[0]
+    elif len(parts) == 2:
+        core = f"{parts[0]} and {parts[1]}"
+    else:
+        core = ", ".join(parts[:-1]) + f", and {parts[-1]}"
+
+    return core if positive else f"volatility around {core}"
+
+
 def _lineup_announced(team_token):
     token = str(team_token or "").strip()
     # Historical marker convention from prediction payload:
@@ -421,8 +454,47 @@ def _fallback_commentary(context):
         analyst_name, analyst_title = ANALYST_BY_STYLE.get(
             style, ("Mack Ledger", "Market Maker")
         )
-    winner_signals = context.get("winner_signals", "No model signal list available.")
-    loser_signals = context.get("loser_signals", "No model signal list available.")
+    winner_signals_raw = context.get("winner_signals", "No model signal list available.")
+    loser_signals_raw = context.get("loser_signals", "No model signal list available.")
+    winner_signals = _signal_sentiment(winner_signals_raw, positive=True)
+    loser_signals = _signal_sentiment(loser_signals_raw, positive=False)
+
+    # Unified richer fallback paragraph to reduce repetitive templated wording.
+    openers = [
+        "Here’s the card:",
+        "Game-day notebook:",
+        "First-pitch read:",
+        "This matchup sets up this way:",
+    ]
+    tone_by_style = {
+        "market maker": "Price and matchup are aligned, so the read stays actionable.",
+        "matchup film room": "The game script points to the side with the cleaner path over nine innings.",
+        "quant": "The edge comes from stacked moderate signals rather than one noisy outlier.",
+        "momentum & vibes": "The profile carries fewer soft spots once leverage innings arrive.",
+        "beat writer": "One club enters with steadier two-way structure while the other needs extra variance.",
+        "data scientist": "Directional probability and practical matchup context are rowing together.",
+        "contrarian": "Market framing still leaves room for this side to win without a perfect script.",
+        "weather/umpire specialist": "External context reinforces the base handicap instead of fighting it.",
+        "showman": "This number and narrative line up in a way that is playable, not just loud.",
+        "process coach": "This is a disciplined edge profile, not a chase setup.",
+        "model whisperer": "Projection direction and on-field shape both support this side.",
+        "underdog hunter": "Value case is built on stability and path quality, not noise.",
+        "line movement hawk": "Price behavior confirms the read rather than contradicting it.",
+        "injury/lineup impact": "Availability and continuity are meaningful in this matchup.",
+        "totals architect": "Run-environment framing supports the side and narrows upset paths.",
+        "clv auditor": "Process quality and entry discipline are still favorable at this number.",
+    }
+
+    paragraph = (
+        f"{analyst_name} ({analyst_title}) — {random.choice(openers)} "
+        f"{context['winner']} over {context['loser']} at {context['odds']}. "
+        f"Model confidence is {context['confidence']} on {context['data_points']}. "
+        f"{tone_by_style.get(style, 'The setup remains coherent across context and price.')} "
+        f"The preferred side grades better on {winner_signals}, while the opposing profile still shows {loser_signals}. "
+        f"Market movement reads: {movement}. Lineup status: {lineup_status}{lineup_impact_sentence} "
+        f"Weather and crew context: {weather} / {ump}."
+    )
+    return re.sub(r"\s+", " ", paragraph).strip()
 
     if style == "market maker":
         return (

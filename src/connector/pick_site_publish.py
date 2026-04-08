@@ -669,6 +669,8 @@ def _massage_commentary_with_llm(commentary_text, pick, date_text=''):
     text = (commentary_text or '').strip()
     if not text:
         return text
+    if os.environ.get('ENABLE_COMMENTARY_MASSAGE', 'false').strip().lower() not in ('1', 'true', 'yes', 'on'):
+        return text
     if not os.environ.get('OPENAI_API_KEY') and not os.environ.get('OPENROUTER_API_KEY'):
         return text
 
