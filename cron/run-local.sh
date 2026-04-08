@@ -98,9 +98,13 @@ EXIT_CODE=$?
 if [[ $EXIT_CODE -eq 0 ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Completed successfully" >> "$RUN_LOG"
 
-  # Also refresh yesterday pages so completed game results flow onto older pages.
-  "$PYTHON_BIN" "$SRC_DIR/scripts/refresh_yesterday_results.py" >> "$RUN_LOG" 2>&1 \
-    || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Yesterday results refresh failed (continuing)" >> "$RUN_LOG"
+  # Refresh older date pages that still show PENDING results (markdown-driven where available).
+  "$PYTHON_BIN" "$SRC_DIR/scripts/refresh_pending_dates.py" >> "$RUN_LOG" 2>&1 \
+    || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pending-date markdown refresh failed (continuing)" >> "$RUN_LOG"
+
+  # Directly resolve remaining pending statuses in historical HTML pages and refresh dashboard counts.
+  "$PYTHON_BIN" "$SRC_DIR/scripts/update_pending_results_html.py" >> "$RUN_LOG" 2>&1 \
+    || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pending-result HTML resolver failed (continuing)" >> "$RUN_LOG"
 
   if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
     if [[ -z "$BASEBALL_POLISH_CRON_ID" ]]; then
