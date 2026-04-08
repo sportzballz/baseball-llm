@@ -57,6 +57,7 @@ PYTHON_BIN="${PYTHON_BIN:-}"
 COMMENTARY_POLISH_JOB="${COMMENTARY_POLISH_JOB:-true}"
 BASEBALL_POLISH_CRON_ID="${BASEBALL_POLISH_CRON_ID:-5a28aa6c-8486-469c-93a2-e7628e4138a6}"
 LOCAL_USE_LLM_FOR_INITIAL="${LOCAL_USE_LLM_FOR_INITIAL:-false}"
+REFRESH_MATCHUP_METRICS="${REFRESH_MATCHUP_METRICS:-true}"
 
 if [[ -z "$PYTHON_BIN" ]]; then
   if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
@@ -78,6 +79,10 @@ RUN_LOG="$LOG_DIR/${MODEL}-$(date '+%Y-%m-%d').log"
 echo "[$TIMESTAMP] Starting model '$MODEL' with $PYTHON_BIN" >> "$RUN_LOG"
 (
   cd "$SRC_DIR"
+  if [[ "$REFRESH_MATCHUP_METRICS" =~ ^(1|true|yes|on)$ ]]; then
+    "$PYTHON_BIN" "$SRC_DIR/scripts/build_matchup_metrics.py" >> "$RUN_LOG" 2>&1 \
+      || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Matchup metrics refresh failed (continuing)" >> "$RUN_LOG"
+  fi
   if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
     export AUTO_PUBLISH_SITE=false
   fi
