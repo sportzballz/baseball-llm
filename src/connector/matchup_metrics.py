@@ -132,6 +132,19 @@ def apply_cached_metrics_to_advantage(adv_score, game_data, metrics_index, weigh
             away_bonus += 0.25
             reasons.append(f"ops_away_edge={abs(odiff):.3f}")
 
+    bullpen = metric.get("bullpen") or {}
+    home_f = _safe_float(bullpen.get("home_fatigue_score"))
+    away_f = _safe_float(bullpen.get("away_fatigue_score"))
+    if home_f is not None and away_f is not None:
+        # Lower fatigue score = fresher bullpen.
+        diff = away_f - home_f
+        if diff >= 12:
+            home_bonus += 0.22
+            reasons.append(f"bullpen_home_fresher={diff:.1f}")
+        elif diff <= -12:
+            away_bonus += 0.22
+            reasons.append(f"bullpen_away_fresher={abs(diff):.1f}")
+
     if home_bonus == 0 and away_bonus == 0:
         return adv_score, {"applied": False, "metric": metric, "reasons": []}
 

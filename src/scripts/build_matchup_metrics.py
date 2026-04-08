@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from urllib.parse import urlencode
@@ -83,8 +83,18 @@ def fetch_schedule(date_str: str):
     return get_json(url)
 
 
+def fetch_schedule_range(start_date: str, end_date: str):
+    qs = urlencode({"sportId": 1, "startDate": start_date, "endDate": end_date})
+    url = f"https://statsapi.mlb.com/api/v1/schedule?{qs}"
+    return get_json(url)
+
+
 def fetch_live_feed(game_pk: int):
     return get_json(f"https://statsapi.mlb.com/api/v1.1/game/{game_pk}/feed/live")
+
+
+def fetch_boxscore(game_pk: int):
+    return get_json(f"https://statsapi.mlb.com/api/v1/game/{game_pk}/boxscore")
 
 
 def fetch_team_hitting(team_id: int, season: int):
@@ -252,6 +262,98 @@ def fetch_weather_for_game(game_dt_iso: str, venue_name: str):
     }
 
 
+def _iso_to_est_date(iso_ts: str):
+    dt = datetime.fromisoformat(str(iso_ts).replace("Z", "+00:00"))
+    return dt.astimezone(ET).date().isoformat()
+
+
+def compute_bullpen_freshness(as_of_date: str):
+    as_of = datetime.fromisoformat(as_of_date).date()
+    d1 = (as_of - timedelta(days=1)).isoformat()
+    d2 = (as_of - timedelta(days=2)).isoformat()
+    d3 = (as_of - timedelta(days=3)).isoformat()
+
+    sched = fetch_schedule_range(d3, d1)
+    box_cache = {}
+    team_day_pitches = {}
+    team_day_relievers = {}
+
+    for block in (sched or {}).get("dates", []) or []:
+        for g in block.get("games", []) or []:
+            status = ((g.get("status") or {}).get("detailedState") or "").lower()
+            if "final" not in status:
+                continue
+
+            game_pk = g.get("gamePk")
+            if game_pk is None:
+                continue
+
+            if game_pk not in box_cache:
+                try:
+                    box_cache[game_pk] = fetch_boxscore(game_pk)
+                except Exception:
+                    box_cache[game_pk] = None
+
+            box = box_cache.get(game_pk)
+            if not box:
+                continue
+
+            try:
+                g_day = _iso_to_est_date(g.get("gameDate"))
+            except Exception:
+                g_day = d1
+
+            for side in ("home", "away"):
+                team_blob = ((box.get("teams") or {}).get(side) or {})
+                team = team_blob.get("team") or {}
+                team_id = team.get("id")
+                if team_id is None:
+                    continue
+
+                bullpen_ids = [pid for pid in (team_blob.get("bullpen") or []) if pid]
+                players = team_blob.get("players") or {}
+                pitches = 0
+                relievers_used = 0
+                for pid in bullpen_ids:
+                    pdata = players.get(f"ID{pid}") or {}
+                    pstats = ((pdata.get("stats") or {}).get("pitching") or {})
+                    thrown = safe_int(pstats.get("pitchesThrown"))
+                    if thrown is None:
+                        thrown = safe_int(pstats.get("numberOfPitches"))
+                    thrown = thrown or 0
+                    # Some MLB endpoints omit per-pitcher pitch counts for historical boxscores.
+                    # We still treat bullpen entries as appearances for freshness estimation.
+                    if pdata:
+                        relievers_used += 1
+                    pitches += max(0, thrown)
+
+                team_day_pitches.setdefault(team_id, {}).setdefault(g_day, 0)
+                workload_units = pitches + (relievers_used * 12)
+                team_day_pitches[team_id][g_day] += workload_units
+                team_day_relievers.setdefault(team_id, {}).setdefault(g_day, 0)
+                team_day_relievers[team_id][g_day] += relievers_used
+
+    out = {}
+    for team_id, by_day in team_day_pitches.items():
+        p1 = by_day.get(d1, 0)
+        p2 = by_day.get(d2, 0)
+        p3 = by_day.get(d3, 0)
+        weighted = (1.0 * p1) + (0.7 * p2) + (0.4 * p3)
+        fatigue_score = min(100, max(0, int(round(weighted / 3.5))))
+        out[team_id] = {
+            "fatigue_score": fatigue_score,
+            "pitches_last_3d": p1 + p2 + p3,
+            "pitches_by_day": {d1: p1, d2: p2, d3: p3},
+            "relievers_by_day": {
+                d1: (team_day_relievers.get(team_id, {}) or {}).get(d1, 0),
+                d2: (team_day_relievers.get(team_id, {}) or {}).get(d2, 0),
+                d3: (team_day_relievers.get(team_id, {}) or {}).get(d3, 0),
+            },
+        }
+
+    return out
+
+
 def build(date_str: str):
     season = int(date_str[:4])
     sched = fetch_schedule(date_str)
@@ -273,6 +375,11 @@ def build(date_str: str):
 
     team_cache = {}
     pitcher_cache = {}
+    bullpen_cache = {}
+    try:
+        bullpen_cache = compute_bullpen_freshness(date_str)
+    except Exception:
+        bullpen_cache = {}
     matchups = []
 
     for g in games or []:
@@ -333,6 +440,17 @@ def build(date_str: str):
                 weather = fetch_weather_for_game(game_dt, venue_name)
         except Exception:
             weather = None
+
+        home_bp = bullpen_cache.get(home_id, {})
+        away_bp = bullpen_cache.get(away_id, {})
+        home_f = safe_int(home_bp.get("fatigue_score"))
+        away_f = safe_int(away_bp.get("fatigue_score"))
+        bp_edge = "neutral"
+        if home_f is not None and away_f is not None:
+            if home_f + 8 <= away_f:
+                bp_edge = "home_fresher"
+            elif away_f + 8 <= home_f:
+                bp_edge = "away_fresher"
 
         def pitcher_view(s):
             return {
@@ -404,8 +522,12 @@ def build(date_str: str):
             },
             "weather": weather,
             "bullpen": {
-                "fatigue_score": None,
-                "note": "placeholder: derive from rolling reliever usage"
+                "home_fatigue_score": home_f,
+                "away_fatigue_score": away_f,
+                "edge": bp_edge,
+                "home_pitches_last_3d": safe_int(home_bp.get("pitches_last_3d")),
+                "away_pitches_last_3d": safe_int(away_bp.get("pitches_last_3d")),
+                "window": "last_3_days_pre_game",
             },
         }
 
