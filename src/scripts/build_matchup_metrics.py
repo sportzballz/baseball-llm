@@ -9,6 +9,26 @@ from urllib.request import Request, urlopen
 
 ET = ZoneInfo("America/New_York")
 
+
+def get_secret(name: str):
+    val = os.environ.get(name)
+    if val:
+        return val
+
+    repo_root = Path(__file__).resolve().parents[2]
+    for env_name in (".env.local", ".env"):
+        p = repo_root / env_name
+        if not p.exists():
+            continue
+        for line in p.read_text(encoding="utf-8").splitlines():
+            t = line.strip()
+            if not t or t.startswith("#") or "=" not in t:
+                continue
+            k, v = t.split("=", 1)
+            if k.strip() == name:
+                return v.strip().strip('"').strip("'")
+    return None
+
 BALLPARK_COORDS = {
     "Angel Stadium": (33.8003, -117.8827),
     "Busch Stadium": (38.6226, -90.1928),
@@ -95,10 +115,88 @@ def safe_int(v):
         return None
 
 
-def fetch_sportspage_odds(date_str: str):
-    key = os.environ.get("SPORTSPAGE_API_KEY") or os.environ.get("SPORTSBOOK_API_KEY")
+def avg(nums):
+    vals = [float(x) for x in nums if x is not None]
+    if not vals:
+        return None
+    return sum(vals) / len(vals)
+
+
+def fetch_odds_api_odds(date_str: str):
+    key = get_secret("ODDS_API_KEY") or get_secret("THE_ODDS_API_KEY")
     if not key:
-        return {}
+        return {}, {"source": "odds_api", "used": False, "reason": "missing_key"}
+
+    qs = urlencode({
+        "apiKey": key,
+        "regions": "us",
+        "markets": "h2h,spreads,totals",
+        "oddsFormat": "american",
+        "dateFormat": "iso",
+    })
+    url = f"https://api.the-odds-api.com/v4/sports/baseball_mlb/odds/?{qs}"
+
+    req = Request(url)
+    with urlopen(req, timeout=25) as res:
+        body = res.read().decode("utf-8")
+        data = json.loads(body)
+        remaining = res.headers.get("x-requests-remaining")
+        used = res.headers.get("x-requests-used")
+
+    out = {}
+    for g in data or []:
+        home = g.get("home_team")
+        away = g.get("away_team")
+        k = matchup_key(home, away)
+
+        home_ml = []
+        spread_home = []
+        total_over = []
+
+        for b in g.get("bookmakers") or []:
+            for m in b.get("markets") or []:
+                mk = m.get("key")
+                outcomes = m.get("outcomes") or []
+                if mk == "h2h":
+                    o_home = next((o for o in outcomes if o.get("name") == home), None)
+                    if o_home:
+                        home_ml.append(safe_int(o_home.get("price")))
+                elif mk == "spreads":
+                    o_home = next((o for o in outcomes if o.get("name") == home), None)
+                    if o_home:
+                        spread_home.append(safe_float(o_home.get("point")))
+                elif mk == "totals":
+                    o_over = next((o for o in outcomes if str(o.get("name", "")).lower() == "over"), None)
+                    if o_over:
+                        total_over.append(safe_float(o_over.get("point")))
+
+        cur_ml = avg(home_ml)
+        cur_spread = avg(spread_home)
+        cur_total = avg(total_over)
+
+        out[k] = {
+            "moneyline_open_home": safe_int(cur_ml),
+            "moneyline_current_home": safe_int(cur_ml),
+            "spread_open_home": round(cur_spread, 2) if cur_spread is not None else None,
+            "spread_current_home": round(cur_spread, 2) if cur_spread is not None else None,
+            "total_open": round(cur_total, 2) if cur_total is not None else None,
+            "total_current": round(cur_total, 2) if cur_total is not None else None,
+            "lastUpdated": g.get("commence_time"),
+        }
+
+    return out, {
+        "source": "odds_api",
+        "used": True,
+        "requests_remaining": remaining,
+        "requests_used": used,
+        "date": date_str,
+    }
+
+
+def fetch_sportspage_odds(date_str: str):
+    key = get_secret("SPORTSPAGE_API_KEY") or get_secret("SPORTSBOOK_API_KEY")
+    if not key:
+        return {}, {"source": "sportspage", "used": False, "reason": "missing_key"}
 
     url = f"https://sportspage-feeds.p.rapidapi.com/games?odds=moneyline&league=MLB&date={date_str}"
     headers = {"X-RapidAPI-Key": key, "X-RapidAPI-Host": "sportspage-feeds.p.rapidapi.com"}
@@ -119,7 +217,7 @@ def fetch_sportspage_odds(date_str: str):
             "total_current": safe_float((((o.get("total") or {}).get("current") or {}).get("total"))),
             "lastUpdated": o.get("lastUpdated"),
         }
-    return out
+    return out, {"source": "sportspage", "used": True, "date": date_str}
 
 
 def fetch_weather_for_game(game_dt_iso: str, venue_name: str):
@@ -160,7 +258,18 @@ def build(date_str: str):
     dates = (sched or {}).get("dates") or []
     games = dates[0].get("games") if dates else []
 
-    odds_map = fetch_sportspage_odds(date_str)
+    odds_map = {}
+    odds_meta = {}
+    try:
+        odds_map, odds_meta = fetch_odds_api_odds(date_str)
+    except Exception as e:
+        odds_meta = {"source": "odds_api", "used": False, "error": str(e)}
+
+    if not odds_map:
+        try:
+            odds_map, odds_meta = fetch_sportspage_odds(date_str)
+        except Exception as e:
+            odds_map, odds_meta = {}, {"source": "sportspage", "used": False, "error": str(e)}
 
     team_cache = {}
     pitcher_cache = {}
@@ -282,6 +391,7 @@ def build(date_str: str):
                 "both_announced": both_lineups_announced,
             },
             "market": {
+                "source": odds_meta.get("source"),
                 "moneyline_open_home": ml_open,
                 "moneyline_current_home": ml_curr,
                 "moneyline_move": (ml_curr - ml_open) if isinstance(ml_curr, int) and isinstance(ml_open, int) else None,
@@ -304,6 +414,7 @@ def build(date_str: str):
     return {
         "generated_at": datetime.now(ET).isoformat(),
         "date": date_str,
+        "odds_source": odds_meta,
         "count": len(matchups),
         "matchups": matchups,
     }
