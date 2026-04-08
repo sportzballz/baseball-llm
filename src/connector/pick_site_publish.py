@@ -1632,7 +1632,11 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     .cards {{ margin-top:18px; display:grid; grid-template-columns:1fr; gap:14px; }}
     .card {{ border:1px solid var(--line); border-radius:14px; background:var(--panel); padding:16px; }}
     .card h2 {{ margin:0 0 10px; font-size:21px; line-height:1.2; }}
-    .pick-panel {{ display:block; }}
+    .pick-tabs {{ display:flex; gap:8px; flex-wrap:wrap; margin:8px 0 12px; }}
+    .pick-tab {{ border:1px solid #3b5a95; background:rgba(255,255,255,.03); color:#dfeeff; border-radius:9px; padding:9px 12px; font-weight:700; font-size:14px; cursor:pointer; }}
+    .pick-tab.active {{ color:#081224; border-color:transparent; background:linear-gradient(90deg,var(--accent),var(--accent2)); }}
+    .pick-panel {{ display:none; }}
+    .pick-panel.active {{ display:block; }}
     .pick-embed {{ width:100%; min-height:1200px; border:1px solid #2e467d; border-radius:12px; background:#0f1830; }}
     .meta {{ font-size:14px; color:var(--muted); margin-top:10px; }}
     .archive-group {{ border:1px solid #304b87; border-radius:10px; padding:10px 12px; background:rgba(255,255,255,.02); margin-bottom:10px; }}
@@ -1676,22 +1680,18 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
       <article class="card">
         <h2>Latest Daily Picks</h2>
         <p>All picks for {latest_date} with full commentary.</p>
-        <section id="panel-daily" class="pick-panel" role="tabpanel">
+        <div class="pick-tabs" role="tablist" aria-label="Pick type tabs">
+          <button class="pick-tab active" data-target="panel-daily" role="tab" aria-selected="true">Money Line</button>
+          <button class="pick-tab" data-target="panel-plus" role="tab" aria-selected="false">Plus Money</button>
+          <button class="pick-tab" data-target="panel-totals" role="tab" aria-selected="false">Run Total</button>
+        </div>
+
+        <section id="panel-daily" class="pick-panel active" role="tabpanel">
           <iframe class="pick-embed" src="{latest_href}" title="Daily Picks"></iframe>
         </section>
-      </article>
-
-      <article class="card">
-        <h2>Plus Money Picks</h2>
-        <p>Underdog card for {latest_date}.</p>
         <section id="panel-plus" class="pick-panel" role="tabpanel">
           <iframe class="pick-embed" src="{latest_plus_href}" title="Plus Money Picks"></iframe>
         </section>
-      </article>
-
-      <article class="card">
-        <h2>Run Total Picks</h2>
-        <p>Over/under leans for {latest_date}.</p>
         <section id="panel-totals" class="pick-panel" role="tabpanel">
           <iframe class="pick-embed" src="{latest_totals_href}" title="Run Total Picks"></iframe>
         </section>
@@ -1707,6 +1707,8 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
   </main>
   <script>
     (() => {{
+      const tabs = Array.from(document.querySelectorAll('.pick-tab'));
+      const panels = Array.from(document.querySelectorAll('.pick-panel'));
       const iframes = Array.from(document.querySelectorAll('.pick-embed'));
 
       function fitIframe(frame) {{
@@ -1720,8 +1722,21 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         }}
       }}
 
+      function activate(targetId) {{
+        tabs.forEach((t) => {{
+          const on = t.dataset.target === targetId;
+          t.classList.toggle('active', on);
+          t.setAttribute('aria-selected', on ? 'true' : 'false');
+        }});
+        panels.forEach((p) => p.classList.toggle('active', p.id === targetId));
+        const active = document.querySelector(`#${{targetId}} .pick-embed`);
+        if (active) setTimeout(() => fitIframe(active), 120);
+      }}
+
       iframes.forEach((f) => f.addEventListener('load', () => fitIframe(f)));
-      setTimeout(() => iframes.forEach((f) => fitIframe(f)), 250);
+      tabs.forEach((t) => t.addEventListener('click', () => activate(t.dataset.target)));
+      const first = document.querySelector('.pick-embed');
+      if (first) setTimeout(() => fitIframe(first), 220);
     }})();
   </script>
 </body>
