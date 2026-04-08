@@ -18,6 +18,20 @@ def _lineup_announced(team_token):
     return not token.startswith(".")
 
 
+def _game_started(prediction):
+    try:
+        date_s = str(getattr(prediction, "gameDate", "")).strip()
+        time_s = str(getattr(prediction, "gameTime", "")).strip()
+        ampm_s = str(getattr(prediction, "ampm", "")).strip().upper()
+        if not date_s or not time_s or not ampm_s:
+            return False
+        est = pytz.timezone('US/Eastern')
+        game_dt = est.localize(datetime.strptime(f"{date_s} {time_s} {ampm_s}", "%Y-%m-%d %I:%M %p"))
+        return datetime.now(est) >= game_dt
+    except Exception:
+        return False
+
+
 def _norm_team_token(token):
     t = str(token or "").strip().lstrip("$.")
     if t.endswith("*"):
@@ -191,6 +205,14 @@ def main(model, model_hitting_fn, model_pitching_fn, model_vs_fn):
                     continue
                 key = _pick_key(w)
                 prev = prior.get(key)
+
+                # Freeze odds once game start time has passed.
+                if prev is not None and _game_started(w):
+                    try:
+                        w.odds = prev.get("odds", w.odds)
+                    except Exception:
+                        pass
+
                 changed = _pick_changed(w, prev)
                 both_announced = _lineup_announced(getattr(w, "winning_team", "")) and _lineup_announced(getattr(w, "losing_team", ""))
 
