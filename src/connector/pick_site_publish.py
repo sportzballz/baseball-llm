@@ -1580,6 +1580,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     latest_totals_href = f"/{latest_date}-run-totals.html"
     latest_picks = latest_picks or []
     frozen_commentary = frozen_commentary or {}
+    latest_stamp = datetime.now().strftime('%y-%b-%d %I:%M %p')
 
     archive_groups = []
     archive_toolbar_groups = []
@@ -1809,7 +1810,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     <section class="cards">
       <article class="card">
         <h2>Latest Daily Picks</h2>
-        <p>All picks for {latest_date} with full commentary.</p>
+        <p>Last Updated: {latest_stamp}</p>
         <div class="pick-tabs" role="tablist" aria-label="Pick type tabs">
           <button class="pick-tab active" data-target="panel-daily" role="tab" aria-selected="true">Money Line</button>
           <button class="pick-tab" data-target="panel-plus" role="tab" aria-selected="false">Plus Money</button>
