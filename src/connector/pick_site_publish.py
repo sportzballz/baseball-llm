@@ -10,6 +10,7 @@ import statsapi
 
 
 SITE_BASE_URL = os.environ.get('SPORTZBALLZ_SITE_URL', 'https://sportzballz.io').rstrip('/')
+HIT_COUNTER_ENDPOINT = os.environ.get('SPORTZBALLZ_HIT_COUNTER_ENDPOINT', 'https://5pakmkcroalpibvk2y7did66pu0extmx.lambda-url.us-east-1.on.aws/').strip()
 
 ANALYST_PANEL = [
     {'id': 'mack-ledger', 'name': 'Mack Ledger', 'title': 'Market Maker', 'voice': 'sharp, odds-first, risk language, no fluff'},
@@ -120,6 +121,7 @@ def _render_media_kit():
     <section class="card"><h2>Contact</h2><p>To sponsor SportzBallz, contact: <strong>info@sportzballz.io</strong>.</p></section>
   </main>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
@@ -167,6 +169,7 @@ def _render_rate_card():
     </section>
   </main>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
@@ -235,6 +238,7 @@ def _render_contact_page():
     }});
   </script>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
@@ -309,6 +313,14 @@ def _embed_mode_script():
       } catch (_e) {}
     })();
   </script>
+'''
+
+
+def _hit_counter_script():
+    endpoint = html.escape(HIT_COUNTER_ENDPOINT)
+    return f'''
+  <script>window.SBZ_HIT_ENDPOINT = "{endpoint}";</script>
+  <script defer src="/assets/hit-counter.js"></script>
 '''
 
 
@@ -1169,6 +1181,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     <footer>Published by SportzBallz.io</footer>
   </main>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
@@ -1330,6 +1343,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     <footer>Published by SportzBallz.io</footer>
   </main>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
@@ -1452,6 +1466,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     <footer>Published by SportzBallz.io</footer>
   </main>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
@@ -1553,6 +1568,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     {''.join(cards)}
   </main>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
@@ -2116,6 +2132,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     </div>
   </main>
   {_embed_mode_script()}
+  {_hit_counter_script()}
 </body>
 </html>
 '''
