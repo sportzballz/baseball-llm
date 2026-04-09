@@ -1012,6 +1012,28 @@ def _extract_existing_commentary_map(html_path: Path):
     return out
 
 
+def _extract_existing_odds_map(html_path: Path):
+    if not html_path.exists():
+        return {}
+    try:
+        text = html_path.read_text()
+    except Exception:
+        return {}
+
+    out = {}
+    pattern = re.compile(
+        r'<h2>\s*(.*?)\s+over\s+(.*?)\s*</h2>.*?<div><span>Odds</span><strong>(.*?)</strong></div>',
+        re.S,
+    )
+    for m in pattern.finditer(text):
+        winner = html.unescape(re.sub(r'<[^>]+>', '', m.group(1)).strip())
+        loser = html.unescape(re.sub(r'<[^>]+>', '', m.group(2)).strip())
+        odds = html.unescape(re.sub(r'<[^>]+>', '', m.group(3)).strip())
+        if winner and loser and odds:
+            out[f"{winner}|||{loser}"] = odds
+    return out
+
+
 def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commentary=None, latest_date=None, archive_dates=None):
     picks_source = evaluated_picks if evaluated_picks is not None else parsed['picks']
     picks = sorted(
@@ -2181,6 +2203,13 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
 
     date_html = site_repo / f"{parsed['date']}.html"
     frozen_commentary = _extract_existing_commentary_map(date_html)
+    frozen_odds = _extract_existing_odds_map(date_html)
+
+    # Do not update odds once game has started or concluded.
+    for p in evaluated_picks:
+        key = f"{p.get('winner', '')}|||{p.get('loser', '')}"
+        if _is_game_started_or_done(p) and key in frozen_odds:
+            p.setdefault('fields', {})['Pick Odds'] = frozen_odds[key]
 
     date_html.write_text(_render_daily_html(parsed, evaluated_picks, summary, frozen_commentary, latest_global, archive))
 
