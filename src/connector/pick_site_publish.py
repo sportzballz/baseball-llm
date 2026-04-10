@@ -1005,6 +1005,19 @@ def _is_game_started_or_done(pick):
     return not any(tok in status for tok in pregame_tokens)
 
 
+def _result_badge(pick, result):
+    rr = str(result or 'PENDING').upper()
+    if rr == 'PENDING' and _is_game_started_or_done(pick):
+        return 'In Progress', 'res-inprogress'
+    if rr == 'WIN':
+        return 'WIN', 'res-win'
+    if rr == 'LOSS':
+        return 'LOSS', 'res-loss'
+    if rr == 'UNKNOWN':
+        return 'UNKNOWN', 'res-pending'
+    return 'PENDING', 'res-pending'
+
+
 def _extract_existing_commentary_map(html_path: Path):
     if not html_path.exists():
         return {}
@@ -1064,12 +1077,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     cards = []
     for i, p in enumerate(picks, 1):
         winner, loser = p['winner'], p['loser']
-        result = p.get('result', 'PENDING')
-        result_class = 'res-pending'
-        if result == 'WIN':
-            result_class = 'res-win'
-        elif result == 'LOSS':
-            result_class = 'res-loss'
+        result_label, result_class = _result_badge(p, p.get('result', 'PENDING'))
         key = f"{winner}|||{loser}"
         if _is_game_started_or_done(p) and key in frozen_commentary:
             analysis = frozen_commentary[key]
@@ -1081,7 +1089,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
         <div class="pick-head">
           <div class="pick-num">Pick {i}</div>
           <h2>{html.escape(winner)} over {html.escape(loser)}</h2>
-          <span class="res {result_class}">{result}</span>
+          <span class="res {result_class}">{result_label}</span>
         </div>
         <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} prediction — {html.escape(date_str)}</div>
         <div class="meta-grid">
@@ -1149,6 +1157,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
+    .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .tracker{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:16px}}
     .tracker-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}}
     .tcard{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
@@ -1211,12 +1220,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     cards = []
     for i, p in enumerate(plus_picks, 1):
         winner, loser = p['winner'], p['loser']
-        result = p.get('result', 'PENDING')
-        result_class = 'res-pending'
-        if result == 'WIN':
-            result_class = 'res-win'
-        elif result == 'LOSS':
-            result_class = 'res-loss'
+        result_label, result_class = _result_badge(p, p.get('result', 'PENDING'))
         key = f"{winner}|||{loser}"
         if _is_game_started_or_done(p) and key in frozen_commentary:
             analysis = frozen_commentary[key]
@@ -1228,7 +1232,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
         <div class="pick-head">
           <div class="pick-num">Underdog {i}</div>
           <h2>{html.escape(winner)} over {html.escape(loser)}</h2>
-          <span class="res {result_class}">{result}</span>
+          <span class="res {result_class}">{result_label}</span>
         </div>
         <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} prediction — {html.escape(date_str)}</div>
         <div class="meta-grid">
@@ -1311,6 +1315,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
+    .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .tracker{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:16px}}
     .tracker-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}}
     .tcard{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
@@ -1369,18 +1374,13 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     cards = []
     for i, (src_pick, l) in enumerate(leans, 1):
         price = l['over_odds'] if l['pick'] == 'OVER' else l['under_odds']
-        result = _run_total_result_for_pick(src_pick, l)
-        result_class = 'res-pending'
-        if result == 'WIN':
-            result_class = 'res-win'
-        elif result == 'LOSS':
-            result_class = 'res-loss'
+        result_label, result_class = _result_badge(src_pick, _run_total_result_for_pick(src_pick, l))
         cards.append(f'''
       <article class="pick-card">
         <div class="pick-head">
           <div class="pick-num">Run Total {i}</div>
           <h2>{html.escape(l['winner'])} vs {html.escape(l['loser'])} — {l['pick']} {l['line']}</h2>
-          <span class="res {result_class}">{result}</span>
+          <span class="res {result_class}">{result_label}</span>
         </div>
         <div class="meta-grid">
           <div><span>Lean</span><strong>{l['pick']} {l['line']}</strong></div>
@@ -1439,6 +1439,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
+    .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .pick-num{{font:600 12px/1 Inter,system-ui,sans-serif;color:var(--accent);letter-spacing:.12em;text-transform:uppercase}}
     .meta-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px;padding:10px 0 2px}}
     .meta-grid div{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
@@ -1490,12 +1491,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     cards = []
     for i, p in enumerate(picks, 1):
         winner, loser = p['winner'], p['loser']
-        result = p.get('result', 'PENDING')
-        result_class = 'res-pending'
-        if result == 'WIN':
-            result_class = 'res-win'
-        elif result == 'LOSS':
-            result_class = 'res-loss'
+        result_label, result_class = _result_badge(p, p.get('result', 'PENDING'))
 
         key = f"{winner}|||{loser}"
         if _is_game_started_or_done(p) and key in frozen_commentary:
@@ -1508,7 +1504,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
         <div class="pick-head">
           <div class="pick-num">Run Line {i}</div>
           <h2>{html.escape(winner)} vs {html.escape(loser)} — Run Line Lean</h2>
-          <span class="res {result_class}">{result}</span>
+          <span class="res {result_class}">{result_label}</span>
         </div>
         <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} run line prediction — {html.escape(date_str)}</div>
         <div class="meta-grid">
@@ -1549,6 +1545,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
+    .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .meta-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px;padding:10px 0 2px}}
     .meta-grid div{{border:1px dashed #31508e;border-radius:10px;padding:8px 10px;background:rgba(255,255,255,.02)}}
     .meta-grid span{{display:block;color:var(--muted);font:600 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}}
@@ -1618,13 +1615,8 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         lean = _run_total_lean(p)
         if lean:
             latest_totals.append((p, lean))
-    def _result_class(r):
-        rr = str(r or 'PENDING').upper()
-        if rr == 'WIN':
-            return 'res-win'
-        if rr == 'LOSS':
-            return 'res-loss'
-        return 'res-pending'
+    def _result_badge_for(pick, result):
+        return _result_badge(pick, result)
 
     latest_items = []
     for i, p in enumerate(latest_sorted, 1):
@@ -1635,12 +1627,13 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         else:
             analysis = _pick_commentary_text(p, i, latest_date)
         result = p.get('result', 'PENDING')
+        result_label, result_class = _result_badge_for(p, result)
         latest_items.append(f'''
           <article class="pick-card">
             <div class="pick-head">
               <div class="pick-num">Pick {i}</div>
               <h3>{html.escape(winner)} over {html.escape(loser)}</h3>
-              <span class="res {_result_class(result)}">{result}</span>
+              <span class="res {result_class}">{result_label}</span>
             </div>
             <div class="meta-grid">
               <div><span>Odds</span><strong>{html.escape(_field(p,'Pick Odds','----'))}</strong></div>
@@ -1673,12 +1666,13 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         else:
             analysis = _pick_commentary_text(p, i, latest_date)
         result = p.get('result', 'PENDING')
+        result_label, result_class = _result_badge_for(p, result)
         plus_items.append(f'''
           <article class="pick-card">
             <div class="pick-head">
               <div class="pick-num">Underdog {i}</div>
               <h3>{html.escape(winner)} over {html.escape(loser)}</h3>
-              <span class="res {_result_class(result)}">{result}</span>
+              <span class="res {result_class}">{result_label}</span>
             </div>
             <div class="meta-grid">
               <div><span>Odds</span><strong>{html.escape(_field(p,'Pick Odds','----'))}</strong></div>
@@ -1699,7 +1693,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         line = lean.get('line')
         side = lean.get('pick')
         price = lean.get('over_odds') if side == 'OVER' else lean.get('under_odds')
-        result = _run_total_result_for_pick(p, lean)
+        result_label, result_class = _result_badge_for(p, _run_total_result_for_pick(p, lean))
         reasons = ', '.join(lean.get('reasons') or []) or 'balanced conditions and market context'
         rt_analysis = f"Run-total lens: {side} {line} in {p.get('winner','TBD')} vs {p.get('loser','TBD')}. Supporting context includes {reasons}."
         total_items.append(f'''
@@ -1707,7 +1701,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
             <div class="pick-head">
               <div class="pick-num">Run Total {i}</div>
               <h3>{html.escape(p.get('winner','TBD'))} vs {html.escape(p.get('loser','TBD'))} — {side} {line}</h3>
-              <span class="res {_result_class(result)}">{result}</span>
+              <span class="res {result_class}">{result_label}</span>
             </div>
             <div class="meta-grid">
               <div><span>Lean</span><strong>{side} {line}</strong></div>
@@ -2158,6 +2152,7 @@ def _preferred_theme_css() -> str:
     .res-win{background:rgba(34,197,94,.18)!important;color:#86efac!important;border-color:#34d399!important}
     .res-loss{background:rgba(239,68,68,.18)!important;color:#fca5a5!important;border-color:#fb7185!important}
     .res-pending{background:rgba(59,130,246,.18)!important;color:#bfdbfe!important;border-color:#60a5fa!important}
+    .res-inprogress{background:rgba(245,158,11,.25)!important;color:#fde68a!important;border-color:#f59e0b!important}
     """
 
 
