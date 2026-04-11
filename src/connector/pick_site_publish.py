@@ -6,7 +6,6 @@ import hashlib
 import subprocess
 from pathlib import Path
 from datetime import datetime
-from zoneinfo import ZoneInfo
 import statsapi
 
 
@@ -481,8 +480,6 @@ def _run_total_lean(pick):
 
 
 def _run_total_result_for_pick(pick, lean):
-    if pick.get('_force_pending'):
-        return 'PENDING'
     game = pick.get('_game') or {}
     home_score = game.get('home_score')
     away_score = game.get('away_score')
@@ -504,7 +501,7 @@ def _run_total_result_for_pick(pick, lean):
         actual_side = 'PUSH'
 
     if actual_side == 'PUSH':
-        return 'UNKNOWN'
+        return 'PUSH'
     return 'WIN' if actual_side == lean.get('pick') else 'LOSS'
 
 
@@ -789,8 +786,6 @@ def _build_matchup_games(game_date: str):
 
 def _evaluate_picks(parsed):
     matchups = _build_matchup_games(parsed['date'])
-    today_et = datetime.now(ZoneInfo('America/New_York')).strftime('%Y-%m-%d')
-    force_pending_for_day = str(parsed.get('date') or '') == today_et
     seen_idx = {}
     evaluated = []
 
@@ -811,18 +806,16 @@ def _evaluate_picks(parsed):
         if game:
             status = game.get('status', 'Unknown')
             actual_winner = game.get('winner')
-            if not force_pending_for_day:
-                if game.get('is_final') and actual_winner:
-                    result = 'WIN' if actual_winner == winner else 'LOSS'
-                elif game.get('is_final') and not actual_winner:
-                    result = 'UNKNOWN'
+            if game.get('is_final') and actual_winner:
+                result = 'WIN' if actual_winner == winner else 'LOSS'
+            elif game.get('is_final') and not actual_winner:
+                result = 'UNKNOWN'
 
         ev = dict(p)
         ev['result'] = result
         ev['game_status'] = status
         ev['actual_winner'] = actual_winner
         ev['_game'] = game
-        ev['_force_pending'] = force_pending_for_day
         evaluated.append(ev)
 
     decided = [x for x in evaluated if x['result'] in ('WIN', 'LOSS')]
@@ -1020,14 +1013,14 @@ def _is_game_started_or_done(pick):
 
 def _result_badge(pick, result):
     rr = str(result or 'PENDING').upper()
-    if pick.get('_force_pending'):
-        return 'PENDING', 'res-pending'
     if rr == 'PENDING' and _is_game_started_or_done(pick):
         return 'In Progress', 'res-inprogress'
     if rr == 'WIN':
         return 'WIN', 'res-win'
     if rr == 'LOSS':
         return 'LOSS', 'res-loss'
+    if rr == 'PUSH':
+        return 'PUSH', 'res-push'
     if rr == 'UNKNOWN':
         return 'UNKNOWN', 'res-pending'
     return 'PENDING', 'res-pending'
@@ -1173,6 +1166,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     .res{{font:700 11px/1 Inter,system-ui,sans-serif;padding:5px 8px;border-radius:999px;border:1px solid #31508e;}}
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
+    .res-push{{color:#fde68a;border-color:#d4a11d;background:rgba(212,161,29,.18)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
     .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .tracker{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:16px}}
@@ -1338,6 +1332,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     .res{{font:700 11px/1 Inter,system-ui,sans-serif;padding:5px 8px;border-radius:999px;border:1px solid #31508e;}}
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
+    .res-push{{color:#fde68a;border-color:#d4a11d;background:rgba(212,161,29,.18)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
     .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .tracker{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:16px}}
@@ -1469,6 +1464,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     .res{{display:inline-flex;align-items:center;justify-content:center;padding:5px 9px;border-radius:999px;border:1px solid #35518f;font:700 11px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#dce8ff;background:rgba(255,255,255,.04)}}
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
+    .res-push{{color:#fde68a;border-color:#d4a11d;background:rgba(212,161,29,.18)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
     .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .pick-num{{font:600 12px/1 Inter,system-ui,sans-serif;color:var(--accent);letter-spacing:.12em;text-transform:uppercase}}
@@ -1582,6 +1578,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     .res{{font:700 11px/1 Inter,system-ui,sans-serif;padding:5px 8px;border-radius:999px;border:1px solid #31508e;}}
     .res-win{{color:#7CFFB3;border-color:#2f8f57;background:rgba(52,211,153,.12)}}
     .res-loss{{color:#ff9ca0;border-color:#a13d47;background:rgba(239,68,68,.14)}}
+    .res-push{{color:#fde68a;border-color:#d4a11d;background:rgba(212,161,29,.18)}}
     .res-pending{{color:#cfe1ff;border-color:#3c5c97;background:rgba(59,130,246,.12)}}
     .res-inprogress{{color:#fde68a;border-color:#f59e0b;background:rgba(245,158,11,.18)}}
     .meta-grid{{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px;padding:10px 0 2px}}
@@ -2194,6 +2191,7 @@ def _preferred_theme_css() -> str:
     .nav-toolbar .toolbar-group summary{background:linear-gradient(135deg,rgba(0,209,255,.20),rgba(124,255,122,.14))!important;border-color:#3f6daf!important}
     .res-win{background:rgba(34,197,94,.18)!important;color:#86efac!important;border-color:#34d399!important}
     .res-loss{background:rgba(239,68,68,.18)!important;color:#fca5a5!important;border-color:#fb7185!important}
+    .res-push{background:rgba(212,161,29,.25)!important;color:#fde68a!important;border-color:#d4a11d!important}
     .res-pending{background:rgba(59,130,246,.18)!important;color:#bfdbfe!important;border-color:#60a5fa!important}
     .res-inprogress{background:rgba(245,158,11,.25)!important;color:#fde68a!important;border-color:#f59e0b!important}
     """
