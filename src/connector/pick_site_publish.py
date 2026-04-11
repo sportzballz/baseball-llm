@@ -1425,7 +1425,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
         </div>
         <div class="meta-grid">
           <div><span>Lean</span><strong>{l['pick']} {l['line']}</strong></div>
-          <div><span>Price</span><strong>{price if price is not None else '—'}</strong></div>
+          <div><span>Odds</span><strong>{price if price is not None else '—'}</strong></div>
           <div><span>Confidence</span><strong>{l['confidence']}</strong></div>
           <div><span>Venue</span><strong>{html.escape(l['venue'])}</strong></div>
         </div>
