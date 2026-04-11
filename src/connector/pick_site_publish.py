@@ -6,6 +6,7 @@ import hashlib
 import subprocess
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import statsapi
 
 
@@ -747,6 +748,22 @@ def _safe_int(v):
         return None
 
 
+def _first_pitch_text(pick):
+    g = pick.get('_game') or {}
+    dt_raw = str(g.get('game_datetime') or '').strip()
+    if not dt_raw:
+        return 'First pitch: TBD'
+    try:
+        dt_norm = dt_raw.replace('Z', '+00:00')
+        dt = datetime.fromisoformat(dt_norm)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo('UTC'))
+        et = dt.astimezone(ZoneInfo('America/New_York'))
+        return f"First pitch: {et.strftime('%-I:%M %p ET')}"
+    except Exception:
+        return 'First pitch: TBD'
+
+
 def _build_matchup_games(game_date: str):
     games = statsapi.schedule(start_date=game_date, end_date=game_date)
     matchups = {}
@@ -1099,7 +1116,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
           <h2>{html.escape(winner)} over {html.escape(loser)}</h2>
           <span class="res {result_class}">{result_label}</span>
         </div>
-        <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} prediction — {html.escape(date_str)}</div>
+        <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} prediction — {html.escape(date_str)} • {html.escape(_first_pitch_text(p))}</div>
         <div class="meta-grid">
           <div><span>Odds</span><strong>{html.escape(_field(p,'Pick Odds','----'))}</strong></div>
           <div><span>Confidence</span><strong>{html.escape(_field(p,'Model Confidence','n/a'))}</strong></div>
@@ -1250,7 +1267,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
           <h2>{html.escape(winner)} over {html.escape(loser)}</h2>
           <span class="res {result_class}">{result_label}</span>
         </div>
-        <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} prediction — {html.escape(date_str)}</div>
+        <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} prediction — {html.escape(date_str)} • {html.escape(_first_pitch_text(p))}</div>
         <div class="meta-grid">
           <div><span>Odds</span><strong>{html.escape(_field(p,'Pick Odds','----'))}</strong></div>
           <div><span>Confidence</span><strong>{html.escape(_field(p,'Model Confidence','n/a'))}</strong></div>
@@ -1538,7 +1555,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
           <h2>{html.escape(winner)} vs {html.escape(loser)} — Run Line Lean</h2>
           <span class="res {result_class}">{result_label}</span>
         </div>
-        <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} run line prediction — {html.escape(date_str)}</div>
+        <div class="seo-line">{html.escape(winner)} vs {html.escape(loser)} run line prediction — {html.escape(date_str)} • {html.escape(_first_pitch_text(p))}</div>
         <div class="meta-grid">
           <div><span>Run Line</span><strong>Model lean side: {html.escape(winner)}</strong></div>
           <div><span>Confidence</span><strong>{html.escape(_field(p,'Model Confidence','n/a'))}</strong></div>
