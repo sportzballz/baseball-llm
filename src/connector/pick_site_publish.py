@@ -1119,6 +1119,78 @@ def _extract_existing_odds_map(html_path: Path):
     return out
 
 
+def _extract_existing_run_totals_map(html_path: Path):
+    if not html_path.exists():
+        return {}
+    try:
+        text = html_path.read_text()
+    except Exception:
+        return {}
+
+    out = {}
+    card_pattern = re.compile(
+        r'<article class="pick-card">.*?'
+        r'<h2>\s*(.*?)\s+vs\s+(.*?)\s+—\s*(OVER|UNDER)\s*([0-9]+(?:\.[0-9]+)?)\s*</h2>.*?'
+        r'<div><span>Odds</span><strong>(.*?)</strong></div>.*?'
+        r'<div><span>Confidence</span><strong>(.*?)</strong></div>.*?'
+        r'</article>',
+        re.S,
+    )
+    for m in card_pattern.finditer(text):
+        winner = html.unescape(re.sub(r'<[^>]+>', '', m.group(1)).strip())
+        loser = html.unescape(re.sub(r'<[^>]+>', '', m.group(2)).strip())
+        side = str(m.group(3) or '').strip().upper()
+        line_txt = str(m.group(4) or '').strip()
+        odds_txt = html.unescape(re.sub(r'<[^>]+>', '', m.group(5)).strip())
+        conf_txt = html.unescape(re.sub(r'<[^>]+>', '', m.group(6)).strip())
+        if not (winner and loser and side in ('OVER', 'UNDER') and line_txt):
+            continue
+        try:
+            line_val = float(line_txt)
+        except Exception:
+            continue
+        odds_val = _odds_value(odds_txt)
+        key = f"{winner}|||{loser}"
+        out[key] = {
+            'pick': side,
+            'line': line_val,
+            'odds': odds_val,
+            'confidence': conf_txt,
+        }
+    return out
+
+
+def _freeze_run_total_lean_if_started(src_pick, lean, frozen_totals):
+    if not _is_game_started_or_done(src_pick):
+        return lean
+    key = f"{src_pick.get('winner', '')}|||{src_pick.get('loser', '')}"
+    frozen = (frozen_totals or {}).get(key)
+    if not frozen:
+        return lean
+
+    out = dict(lean)
+    frozen_side = frozen.get('pick')
+    if frozen_side in ('OVER', 'UNDER'):
+        out['pick'] = frozen_side
+
+    frozen_line = frozen.get('line')
+    if isinstance(frozen_line, (int, float)):
+        out['line'] = float(frozen_line)
+
+    frozen_odds = frozen.get('odds')
+    if frozen_odds is not None:
+        if out.get('pick') == 'OVER':
+            out['over_odds'] = frozen_odds
+        elif out.get('pick') == 'UNDER':
+            out['under_odds'] = frozen_odds
+
+    frozen_conf = frozen.get('confidence')
+    if frozen_conf not in (None, ''):
+        out['confidence'] = frozen_conf
+
+    return out
+
+
 def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commentary=None, latest_date=None, archive_dates=None):
     picks_source = evaluated_picks if evaluated_picks is not None else parsed['picks']
     picks = sorted(
@@ -1432,7 +1504,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
 '''
 
 
-def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, archive_dates=None):
+def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, archive_dates=None, frozen_totals=None):
     source = evaluated_picks if evaluated_picks is not None else parsed['picks']
     leans = []
     for p in source:
@@ -1449,8 +1521,10 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     model = parsed['model']
     now = datetime.now().strftime('%Y-%m-%d %I:%M %p')
 
+    frozen_totals = frozen_totals or {}
     cards = []
     for i, (src_pick, l) in enumerate(leans, 1):
+        l = _freeze_run_total_lean_if_started(src_pick, l, frozen_totals)
         price = l['over_odds'] if l['pick'] == 'OVER' else l['under_odds']
         result_label, result_class = _result_badge(src_pick, _run_total_result_for_pick(src_pick, l))
         cards.append(f'''
@@ -1667,7 +1741,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
 '''
 
 
-def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen_commentary=None):
+def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen_commentary=None, frozen_totals=None):
     latest_href = f"/{latest_date}.html"
     latest_plus_href = f"/{latest_date}-plus-money.html"
     latest_totals_href = f"/{latest_date}-run-totals.html"
@@ -1699,6 +1773,8 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
             </div>
           </details>
         ''')
+
+    frozen_totals = frozen_totals or {}
 
     latest_sorted = sorted(
         latest_picks,
@@ -1786,6 +1862,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
 
     total_items = []
     for i, (p, lean) in enumerate(latest_totals, 1):
+        lean = _freeze_run_total_lean_if_started(p, lean, frozen_totals)
         line = lean.get('line')
         side = lean.get('pick')
         price = lean.get('over_odds') if side == 'OVER' else lean.get('under_odds')
@@ -2353,6 +2430,8 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     date_html = site_repo / f"{parsed['date']}.html"
     frozen_commentary = _extract_existing_commentary_map(date_html)
     frozen_odds = _extract_existing_odds_map(date_html)
+    totals_html = site_repo / f"{parsed['date']}-run-totals.html"
+    frozen_totals = _extract_existing_run_totals_map(totals_html)
 
     # Do not update odds once game has started or concluded.
     for p in evaluated_picks:
@@ -2368,8 +2447,7 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     run_line_html = site_repo / f"{parsed['date']}-run-line.html"
     run_line_html.write_text(_render_run_line_html(parsed, evaluated_picks, frozen_commentary, latest_global, archive))
 
-    totals_html = site_repo / f"{parsed['date']}-run-totals.html"
-    totals_html.write_text(_render_run_totals_html(parsed, evaluated_picks, latest_global, archive))
+    totals_html.write_text(_render_run_totals_html(parsed, evaluated_picks, latest_global, archive, frozen_totals))
 
     history_path, history = _load_history(site_repo)
     history = _upsert_history(history, summary)
@@ -2379,7 +2457,7 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     (site_repo / 'rate-card.html').write_text(_render_rate_card())
     (site_repo / 'contact.html').write_text(_render_contact_page())
 
-    (site_repo / 'index.html').write_text(_render_top_index(parsed['date'], archive, evaluated_picks, frozen_commentary))
+    (site_repo / 'index.html').write_text(_render_top_index(parsed['date'], archive, evaluated_picks, frozen_commentary, frozen_totals))
     (site_repo / 'robots.txt').write_text(_render_robots_txt())
     (site_repo / 'sitemap.xml').write_text(_render_sitemap_xml(archive))
 
