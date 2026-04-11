@@ -306,6 +306,12 @@ def _embed_mode_script():
   <script>
     (() => {
       try {
+        document.querySelectorAll('[data-reload="1"]').forEach((el) => {
+          el.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.reload();
+          });
+        });
         const params = new URLSearchParams(window.location.search || '');
         if (params.get('embed') === '1') {
           document.querySelectorAll('.nav-toolbar').forEach((el) => el.remove());
@@ -1144,7 +1150,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
     h1{{margin:8px 0 10px;font-size:clamp(30px,5vw,46px);line-height:1.05}}
     .sub{{color:var(--muted);font-family:Inter,system-ui,sans-serif;font-size:14px}}
     .header-row{{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}}
-    .reload-btn{{border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}}
+    .reload-btn{{display:inline-block;border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}}
     .ad-slot{{background:rgba(255,255,255,.03);border:1px dashed #3b5a96;border-radius:12px;padding:12px 14px;margin:0 0 14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}}
     .ad-label{{font:700 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#9cc4ff}}
     .ad-copy{{color:#d9e6ff;font:500 14px/1.3 Inter,system-ui,sans-serif}}
@@ -1187,7 +1193,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
           <h1>MLB Daily Notebook — {html.escape(date_str)}</h1>
           <div class="sub">Model: {html.escape(model)} • Updated {html.escape(now)}</div>
         </div>
-        <button class="reload-btn" type="button" onclick="window.location.reload()">Reload</button>
+        <a class="reload-btn" href="" data-reload="1">Reload</a>
       </div>
     </header>
     {toolbar_html}
@@ -1309,7 +1315,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
     h1{{margin:8px 0 10px;font-size:clamp(30px,5vw,46px);line-height:1.05}}
     .sub{{color:var(--muted);font-family:Inter,system-ui,sans-serif;font-size:14px}}
     .header-row{{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}}
-    .reload-btn{{border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}}
+    .reload-btn{{display:inline-block;border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}}
     .ad-slot{{background:rgba(255,255,255,.03);border:1px dashed #3b5a96;border-radius:12px;padding:12px 14px;margin:0 0 14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}}
     .ad-label{{font:700 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#9cc4ff}}
     .ad-copy{{color:#d9e6ff;font:500 14px/1.3 Inter,system-ui,sans-serif}}
@@ -1352,7 +1358,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
           <h1>Plus Money Picks — {html.escape(date_str)}</h1>
           <div class="sub">Model: {html.escape(model)} • Updated {html.escape(now)}</div>
         </div>
-        <button class="reload-btn" type="button" onclick="window.location.reload()">Reload</button>
+        <a class="reload-btn" href="" data-reload="1">Reload</a>
       </div>
     </header>
     {toolbar_html}
@@ -1442,7 +1448,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     h1{{margin:8px 0 10px;font-size:clamp(30px,5vw,46px);line-height:1.05}}
     .sub{{color:var(--muted);font-family:Inter,system-ui,sans-serif;font-size:14px}}
     .header-row{{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}}
-    .reload-btn{{border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}}
+    .reload-btn{{display:inline-block;border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}}
     .ad-slot{{background:rgba(255,255,255,.03);border:1px dashed #3b5a96;border-radius:12px;padding:12px 14px;margin:0 0 14px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}}
     .ad-label{{font:700 11px/1 Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.08em;color:#9cc4ff}}
     .ad-copy{{color:#d9e6ff;font:500 14px/1.3 Inter,system-ui,sans-serif}}
@@ -1479,7 +1485,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
           <h1>Run Total Picks — {html.escape(date_str)}</h1>
           <div class="sub">Model: {html.escape(model)} • Updated {html.escape(now)}</div>
         </div>
-        <button class="reload-btn" type="button" onclick="window.location.reload()">Reload</button>
+        <a class="reload-btn" href="" data-reload="1">Reload</a>
       </div>
     </header>
     {toolbar_html}
@@ -1558,7 +1564,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
     h1{{margin:8px 0 10px;font-size:clamp(30px,5vw,46px);line-height:1.05}}
     .sub{{color:var(--muted);font-family:Inter,system-ui,sans-serif;font-size:14px}}
     .header-row{{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}}
-    .reload-btn{{border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer}}
+    .reload-btn{{display:inline-block;border:1px solid #4c6db0;background:#10203b;color:#dff2ff;border-radius:10px;padding:8px 12px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}}
     .pick-card{{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin:0 0 14px 0;box-shadow:0 8px 22px rgba(2,8,24,.32)}}
     .pick-head h2{{margin:4px 0 8px;font-size:27px;line-height:1.15}}
     .pick-head{{display:flex;align-items:center;gap:10px;flex-wrap:wrap}}
@@ -1586,7 +1592,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
           <h1>Run Line Picks — {html.escape(date_str)}</h1>
           <div class="sub">Model: {html.escape(model)} • Updated {html.escape(now)}</div>
         </div>
-        <button class="reload-btn" type="button" onclick="window.location.reload()">Reload</button>
+        <a class="reload-btn" href="" data-reload="1">Reload</a>
       </div>
     </header>
     {toolbar_html}
