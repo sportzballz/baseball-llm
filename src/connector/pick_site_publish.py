@@ -748,6 +748,14 @@ def _safe_int(v):
         return None
 
 
+def _fmt_american(odds):
+    try:
+        o = int(odds)
+    except Exception:
+        return '—'
+    return f'+{o}' if o > 0 else str(o)
+
+
 def _first_pitch_text(pick):
     g = pick.get('_game') or {}
     dt_raw = str(g.get('game_datetime') or '').strip()
@@ -1425,7 +1433,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
         </div>
         <div class="meta-grid">
           <div><span>Lean</span><strong>{l['pick']} {l['line']}</strong></div>
-          <div><span>Odds</span><strong>{price if price is not None else '—'}</strong></div>
+          <div><span>Odds</span><strong>{_fmt_american(price)}</strong></div>
           <div><span>Confidence</span><strong>{l['confidence']}</strong></div>
           <div><span>Venue</span><strong>{html.escape(l['venue'])}</strong></div>
         </div>
@@ -1762,7 +1770,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
             </div>
             <div class="meta-grid">
               <div><span>Lean</span><strong>{side} {line}</strong></div>
-              <div><span>Odds</span><strong>{price if price is not None else '—'}</strong></div>
+              <div><span>Odds</span><strong>{_fmt_american(price)}</strong></div>
               <div><span>Confidence</span><strong>{lean.get('confidence')}</strong></div>
               <div><span>Venue</span><strong>{html.escape(lean.get('venue') or 'n/a')}</strong></div>
             </div>

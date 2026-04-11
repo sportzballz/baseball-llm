@@ -49,6 +49,38 @@ def _avg(nums):
     return sum(vals) / len(vals)
 
 
+def _american_to_prob(odds):
+    try:
+        o = int(odds)
+    except Exception:
+        return None
+    if o == 0:
+        return None
+    if o > 0:
+        return 100.0 / (o + 100.0)
+    return abs(o) / (abs(o) + 100.0)
+
+
+def _prob_to_american(prob):
+    try:
+        p = float(prob)
+    except Exception:
+        return None
+    if not (0 < p < 1):
+        return None
+    if p >= 0.5:
+        return -int(round((p / (1.0 - p)) * 100.0))
+    return int(round(((1.0 - p) / p) * 100.0))
+
+
+def _consensus_american(prices):
+    probs = [_american_to_prob(x) for x in prices if x is not None]
+    probs = [p for p in probs if p is not None]
+    if not probs:
+        return None
+    return _prob_to_american(sum(probs) / len(probs))
+
+
 def _odds_api_mlb(today):
     key = _secret("ODDS_API_KEY") or _secret("THE_ODDS_API_KEY")
     if not key:
@@ -97,11 +129,11 @@ def _odds_api_mlb(today):
                     if ou:
                         under_prices.append(_safe_int(ou.get("price")))
 
-        home_cur = _safe_int(_avg(home_ml))
-        away_cur = _safe_int(_avg(away_ml))
+        home_cur = _consensus_american(home_ml)
+        away_cur = _consensus_american(away_ml)
         total_cur = _avg(totals)
-        over_cur = _safe_int(_avg(over_prices))
-        under_cur = _safe_int(_avg(under_prices))
+        over_cur = _consensus_american(over_prices)
+        under_cur = _consensus_american(under_prices)
 
         results.append(
             {

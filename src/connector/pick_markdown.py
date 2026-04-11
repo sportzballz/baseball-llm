@@ -223,7 +223,9 @@ def _extract_total_market(odds_entry):
     if total_current is None:
         text = "Total line unavailable."
     else:
-        text = f"{total_current} (Over {over_odds if over_odds is not None else '—'} / Under {under_odds if under_odds is not None else '—'})"
+        over_txt = _format_odds(over_odds) if over_odds is not None else '—'
+        under_txt = _format_odds(under_odds) if under_odds is not None else '—'
+        text = f"{total_current} (Over {over_txt} / Under {under_txt})"
 
     if total_current is None or total_open is None:
         movement_text = "Total movement unavailable."
