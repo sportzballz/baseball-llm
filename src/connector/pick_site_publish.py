@@ -6,6 +6,7 @@ import hashlib
 import subprocess
 from pathlib import Path
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import statsapi
 
 
@@ -480,6 +481,8 @@ def _run_total_lean(pick):
 
 
 def _run_total_result_for_pick(pick, lean):
+    if pick.get('_force_pending'):
+        return 'PENDING'
     game = pick.get('_game') or {}
     home_score = game.get('home_score')
     away_score = game.get('away_score')
@@ -786,6 +789,8 @@ def _build_matchup_games(game_date: str):
 
 def _evaluate_picks(parsed):
     matchups = _build_matchup_games(parsed['date'])
+    today_et = datetime.now(ZoneInfo('America/New_York')).strftime('%Y-%m-%d')
+    force_pending_for_day = str(parsed.get('date') or '') == today_et
     seen_idx = {}
     evaluated = []
 
@@ -806,16 +811,18 @@ def _evaluate_picks(parsed):
         if game:
             status = game.get('status', 'Unknown')
             actual_winner = game.get('winner')
-            if game.get('is_final') and actual_winner:
-                result = 'WIN' if actual_winner == winner else 'LOSS'
-            elif game.get('is_final') and not actual_winner:
-                result = 'UNKNOWN'
+            if not force_pending_for_day:
+                if game.get('is_final') and actual_winner:
+                    result = 'WIN' if actual_winner == winner else 'LOSS'
+                elif game.get('is_final') and not actual_winner:
+                    result = 'UNKNOWN'
 
         ev = dict(p)
         ev['result'] = result
         ev['game_status'] = status
         ev['actual_winner'] = actual_winner
         ev['_game'] = game
+        ev['_force_pending'] = force_pending_for_day
         evaluated.append(ev)
 
     decided = [x for x in evaluated if x['result'] in ('WIN', 'LOSS')]
@@ -1013,6 +1020,8 @@ def _is_game_started_or_done(pick):
 
 def _result_badge(pick, result):
     rr = str(result or 'PENDING').upper()
+    if pick.get('_force_pending'):
+        return 'PENDING', 'res-pending'
     if rr == 'PENDING' and _is_game_started_or_done(pick):
         return 'In Progress', 'res-inprogress'
     if rr == 'WIN':
