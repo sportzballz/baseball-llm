@@ -93,6 +93,7 @@ def _render_media_kit():
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Media Kit</title>
   <meta name="description" content="SportzBallz media kit: audience, sponsorship inventory, and ad opportunities." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -135,6 +136,7 @@ def _render_rate_card():
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Rate Card</title>
   <meta name="description" content="SportzBallz sponsorship pricing and ad package options." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -183,6 +185,7 @@ def _render_contact_page():
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Contact</title>
   <meta name="description" content="Contact SportzBallz for partnerships, feedback, picks questions, and sponsorship inquiries." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -1155,6 +1158,7 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | MLB Predictions {html.escape(date_str)} (Team vs Team)</title>
   <meta name="description" content="MLB team vs team predictions for {html.escape(date_str)} from SportzBallz, including confidence, odds, and matchup context." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -1323,6 +1327,7 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Plus Money Picks</title>
   <meta name="description" content="SportzBallz underdog MLB picks for {html.escape(date_str)}." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -1457,6 +1462,7 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Run Total Picks</title>
   <meta name="description" content="SportzBallz MLB run total picks for {html.escape(date_str)}." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -1580,6 +1586,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Run Line Picks {html.escape(date_str)}</title>
   <meta name="description" content="MLB run line predictions for {html.escape(date_str)} from SportzBallz." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -1788,6 +1795,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Daily MLB Picks</title>
   <meta name="description" content="SportzBallz daily MLB picks, commentary, and betting context." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -2113,6 +2121,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http://www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Ctext%20y%3D%22.9em%22%20font-size%3D%2290%22%3E%E2%9A%BE%3C/text%3E%3C/svg%3E" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
   <title>SportzBallz | Performance Dashboard</title>
   <meta name="description" content="SportzBallz historical MLB pick performance, records, and plus-money metrics." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -2272,6 +2281,21 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
         print(f"Site repo not found: {site_repo}")
         return None
 
+    # Keep iOS/PWA touch icon in sync with SportzBallz logo.
+    logo_src = site_repo / 'assets' / 'sportzballz.png'
+    touch_icon = site_repo / 'apple-touch-icon.png'
+    if logo_src.exists():
+        try:
+            from PIL import Image
+            img = Image.open(logo_src).convert('RGBA').resize((180, 180))
+            img.save(touch_icon)
+        except Exception:
+            if not touch_icon.exists():
+                try:
+                    touch_icon.write_bytes(logo_src.read_bytes())
+                except Exception:
+                    pass
+
     evaluated_picks, summary = _evaluate_picks(parsed)
 
     archive = _find_archive_dates(site_repo)
@@ -2323,7 +2347,7 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     # Commit + push any changes
     add = _run([
         'git', 'add', 'index.html', 'dashboard.html', 'data/performance-history.json',
-        'media-kit.html', 'rate-card.html', 'contact.html', 'robots.txt', 'sitemap.xml',
+        'media-kit.html', 'rate-card.html', 'contact.html', 'robots.txt', 'sitemap.xml', 'apple-touch-icon.png',
         f"{parsed['date']}.html", f"{parsed['date']}-plus-money.html", f"{parsed['date']}-run-line.html", f"{parsed['date']}-run-totals.html"
     ], site_repo)
     if add.returncode != 0:
