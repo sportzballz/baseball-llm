@@ -316,9 +316,33 @@ def _embed_mode_script():
             window.location.reload();
           });
         });
+
         const params = new URLSearchParams(window.location.search || '');
-        if (params.get('embed') === '1') {
+        const isEmbed = params.get('embed') === '1';
+        if (isEmbed) {
           document.querySelectorAll('.nav-toolbar').forEach((el) => el.remove());
+        }
+
+        if (!isEmbed && !document.querySelector('.sbz-to-top')) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'sbz-to-top';
+          btn.textContent = 'Top';
+          btn.setAttribute('aria-label', 'Back to top');
+          btn.style.position = 'fixed';
+          btn.style.right = '16px';
+          btn.style.bottom = '16px';
+          btn.style.zIndex = '9999';
+          btn.style.border = '1px solid #4c6db0';
+          btn.style.borderRadius = '999px';
+          btn.style.padding = '9px 13px';
+          btn.style.background = '#10203b';
+          btn.style.color = '#dff2ff';
+          btn.style.font = '700 12px Inter,system-ui,sans-serif';
+          btn.style.cursor = 'pointer';
+          btn.style.boxShadow = '0 8px 20px rgba(0,0,0,.28)';
+          btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+          document.body.appendChild(btn);
         }
       } catch (_e) {}
     })();
@@ -1908,6 +1932,28 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
       const tabs = Array.from(document.querySelectorAll('.pick-tab'));
       const panels = Array.from(document.querySelectorAll('.pick-panel'));
       const iframes = Array.from(document.querySelectorAll('.pick-embed'));
+
+      if (!document.querySelector('.sbz-to-top')) {{
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'sbz-to-top';
+        btn.textContent = 'Top';
+        btn.setAttribute('aria-label', 'Back to top');
+        btn.style.position = 'fixed';
+        btn.style.right = '16px';
+        btn.style.bottom = '16px';
+        btn.style.zIndex = '9999';
+        btn.style.border = '1px solid #4c6db0';
+        btn.style.borderRadius = '999px';
+        btn.style.padding = '9px 13px';
+        btn.style.background = '#10203b';
+        btn.style.color = '#dff2ff';
+        btn.style.font = '700 12px Inter,system-ui,sans-serif';
+        btn.style.cursor = 'pointer';
+        btn.style.boxShadow = '0 8px 20px rgba(0,0,0,.28)';
+        btn.addEventListener('click', () => window.scrollTo({{ top: 0, behavior: 'smooth' }}));
+        document.body.appendChild(btn);
+      }}
 
       function fitIframe(frame) {{
         try {{
