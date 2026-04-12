@@ -106,6 +106,18 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   "$PYTHON_BIN" "$SRC_DIR/scripts/update_pending_results_html.py" >> "$RUN_LOG" 2>&1 \
     || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pending-result HTML resolver failed (continuing)" >> "$RUN_LOG"
 
+  # Ensure homepage latest tabs stay on *today* after any historical backfill refreshes.
+  TODAY_ET="$(TZ=America/New_York date +%F)"
+  TODAY_PICK="$SRC_DIR/picks/${TODAY_ET}-pick.md"
+  if [[ -f "$TODAY_PICK" ]]; then
+    "$PYTHON_BIN" - <<PY >> "$RUN_LOG" 2>&1 || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Latest-index republish failed (continuing)" >> "$RUN_LOG"
+import sys
+sys.path.append("$SRC_DIR")
+from connector.pick_site_publish import publish_daily_site
+publish_daily_site("$TODAY_PICK", "$REPO_ROOT/../sportzballz.io")
+PY
+  fi
+
   if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
     if [[ -z "$BASEBALL_POLISH_CRON_ID" ]]; then
       echo "[$(date '+%Y-%m-%d %H:%M:%S')] Commentary polish cron id missing (BASEBALL_POLISH_CRON_ID). Skipping polish trigger." >> "$RUN_LOG"
