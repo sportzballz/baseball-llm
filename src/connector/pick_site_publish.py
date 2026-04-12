@@ -1192,6 +1192,35 @@ def _freeze_run_total_lean_if_started(src_pick, lean, frozen_totals):
     return out
 
 
+def _fallback_run_total_lean_from_frozen(src_pick, frozen):
+    side = str((frozen or {}).get('pick') or '').upper()
+    if side not in ('OVER', 'UNDER'):
+        return None
+    line = (frozen or {}).get('line')
+    try:
+        line = float(line)
+    except Exception:
+        return None
+
+    odds = (frozen or {}).get('odds')
+    confidence = (frozen or {}).get('confidence')
+    conf_num = _parse_confidence(str(confidence)) if confidence not in (None, '') else None
+
+    return {
+        'winner': src_pick.get('winner', 'TBD'),
+        'loser': src_pick.get('loser', 'TBD'),
+        'venue': _field(src_pick, 'Venue', 'n/a'),
+        'pick': side,
+        'line': line,
+        'over_odds': odds if side == 'OVER' else None,
+        'under_odds': odds if side == 'UNDER' else None,
+        'confidence': conf_num if conf_num is not None else (_parse_confidence(_field(src_pick, 'Model Confidence', '')) or 0),
+        'weather': _field(src_pick, 'Weather', 'n/a'),
+        'total_movement': _field(src_pick, 'Total Movement', 'n/a'),
+        'reasons': ['frozen pregame total pick'],
+    }
+
+
 def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commentary=None, latest_date=None, archive_dates=None):
     picks_source = evaluated_picks if evaluated_picks is not None else parsed['picks']
     picks = sorted(
@@ -1507,9 +1536,13 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
 
 def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, archive_dates=None, frozen_totals=None):
     source = evaluated_picks if evaluated_picks is not None else parsed['picks']
+    frozen_totals = frozen_totals or {}
     leans = []
     for p in source:
         lean = _run_total_lean(p)
+        if lean is None:
+            key = f"{p.get('winner', '')}|||{p.get('loser', '')}"
+            lean = _fallback_run_total_lean_from_frozen(p, frozen_totals.get(key))
         if lean:
             leans.append((p, lean))
 
@@ -1522,7 +1555,6 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     model = parsed['model']
     now = datetime.now().strftime('%Y-%m-%d %I:%M %p')
 
-    frozen_totals = frozen_totals or {}
     cards = []
     for i, (src_pick, l) in enumerate(leans, 1):
         l = _freeze_run_total_lean_if_started(src_pick, l, frozen_totals)
@@ -1789,6 +1821,9 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     latest_totals = []
     for p in latest_sorted:
         lean = _run_total_lean(p)
+        if lean is None:
+            key = f"{p.get('winner', '')}|||{p.get('loser', '')}"
+            lean = _fallback_run_total_lean_from_frozen(p, frozen_totals.get(key))
         if lean:
             latest_totals.append((p, lean))
     def _result_badge_for(pick, result):
