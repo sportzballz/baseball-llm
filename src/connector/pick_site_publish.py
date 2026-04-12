@@ -284,6 +284,7 @@ def _render_global_toolbar(latest_date: str, archive_dates):
             <div class="archive-links">
               <a href="/{d}.html">Daily Picks</a>
               <a href="/{d}-plus-money.html">Plus Money Picks</a>
+              <a href="/{d}-run-line.html">Run Line Picks</a>
               <a href="/{d}-run-totals.html">Run Total Picks</a>
             </div>
           </details>
@@ -1745,6 +1746,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     latest_href = f"/{latest_date}.html"
     latest_plus_href = f"/{latest_date}-plus-money.html"
     latest_totals_href = f"/{latest_date}-run-totals.html"
+    latest_run_line_href = f"/{latest_date}-run-line.html"
     latest_picks = latest_picks or []
     frozen_commentary = frozen_commentary or {}
     latest_stamp = datetime.now().strftime('%y-%b-%d %I:%M %p')
@@ -1759,6 +1761,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
             <div class="archive-links">
               <a href="/{d}.html">Daily Picks</a>
               <a href="/{d}-plus-money.html">Plus Money Picks</a>
+              <a href="/{d}-run-line.html">Run Line Picks</a>
               <a href="/{d}-run-totals.html">Run Total Picks</a>
             </div>
           </details>
@@ -1769,6 +1772,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
             <div class="archive-links">
               <a href="/{d}.html">Daily Picks</a>
               <a href="/{d}-plus-money.html">Plus Money Picks</a>
+              <a href="/{d}-run-line.html">Run Line Picks</a>
               <a href="/{d}-run-totals.html">Run Total Picks</a>
             </div>
           </details>
@@ -1982,6 +1986,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         <div class="pick-tabs" role="tablist" aria-label="Pick type tabs">
           <button class="pick-tab active" data-target="panel-daily" role="tab" aria-selected="true">Money Line</button>
           <button class="pick-tab" data-target="panel-plus" role="tab" aria-selected="false">Plus Money</button>
+          <button class="pick-tab" data-target="panel-runline" role="tab" aria-selected="false">Run Line</button>
           <button class="pick-tab" data-target="panel-totals" role="tab" aria-selected="false">Run Total</button>
         </div>
 
@@ -1990,6 +1995,9 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
         </section>
         <section id="panel-plus" class="pick-panel" role="tabpanel">
           <iframe class="pick-embed" src="{latest_plus_href}?embed=1" title="Plus Money Picks"></iframe>
+        </section>
+        <section id="panel-runline" class="pick-panel" role="tabpanel">
+          <iframe class="pick-embed" src="{latest_run_line_href}?embed=1" title="Run Line Picks"></iframe>
         </section>
         <section id="panel-totals" class="pick-panel" role="tabpanel">
           <iframe class="pick-embed" src="{latest_totals_href}?embed=1" title="Run Total Picks"></iframe>
