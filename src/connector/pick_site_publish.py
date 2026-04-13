@@ -454,6 +454,9 @@ def _run_total_lean(pick):
     l_sig = _field(pick, f'{loser} Model Signals', '')
     total_line_text = _field(pick, 'Total Line', '')
     total_move_text = _field(pick, 'Total Movement', '')
+    bullpen_total_ctx = _field(pick, 'Bullpen Total Context', '')
+    platoon_total_ctx = _field(pick, 'Platoon Total Context', '')
+    umpire_total_ctx = _field(pick, 'Umpire Total Context', '')
 
     total, over_odds, under_odds = _total_odds_pick(total_line_text)
     if total is None:
@@ -525,6 +528,15 @@ def _run_total_lean(pick):
     elif 'moved down' in tm:
         under_score += 1
         reasons.append('market moved total down')
+
+    # Bullpen + platoon + umpire total-context nudges.
+    ctx_blob = ' | '.join([str(bullpen_total_ctx), str(platoon_total_ctx), str(umpire_total_ctx)]).lower()
+    if 'runs+' in ctx_blob:
+        over_score += 1
+        reasons.append('bullpen/platoon/umpire run context favors over')
+    if 'runs-' in ctx_blob:
+        under_score += 1
+        reasons.append('bullpen/platoon/umpire run context favors under')
 
     if over_score == under_score:
         side = 'OVER' if (over_odds or 0) >= (under_odds or 0) else 'UNDER'

@@ -46,6 +46,17 @@ DOME_VENUES = {
     "Globe Life Field",
 }
 
+# Conservative umpire run-context tendencies (can expand over time).
+# +1 => slightly more run-friendly, -1 => slightly more run-suppressing.
+UMPIRE_RUN_TENDENCY = {
+    # hitter-friendly-ish examples
+    "Laz Diaz": 1,
+    "CB Bucknor": 1,
+    # pitcher-friendly-ish examples
+    "Pat Hoberg": -1,
+    "Tripp Gibson": -1,
+}
+
 
 def _safe_get(dct, path, default=None):
     cur = dct
@@ -651,17 +662,17 @@ def _fallback_commentary(context):
 def _generate_commentary(context):
     # If OpenAI key exists, use get_pick_summary as requested to generate
     # commentary for this pick context; otherwise fall back deterministically.
-    if os.environ.get("OPENAI_API_KEY"):
-        try:
-            from connector.llm import get_pick_summary
+    # if os.environ.get("OPENAI_API_KEY"):
+    #     try:
+    #         from connector.llm import get_pick_summary
 
-            fallback = _fallback_commentary(context)
-            model_name = context.get("model_name", "dutch")
-            llm_text = get_pick_summary(context, fallback, model_name)
-            if llm_text and str(llm_text).strip():
-                return str(llm_text).strip()
-        except Exception as e:
-            print(f"LLM commentary generation failed, using fallback: {e}")
+    #         fallback = _fallback_commentary(context)
+    #         model_name = context.get("model_name", "dutch")
+    #         llm_text = get_pick_summary(context, fallback, model_name)
+    #         if llm_text and str(llm_text).strip():
+    #             return str(llm_text).strip()
+    #     except Exception as e:
+    #         print(f"LLM commentary generation failed, using fallback: {e}")
 
     return _fallback_commentary(context)
 
@@ -735,6 +746,63 @@ def _metrics_summary_for_commentary(metric, winner_name, loser_name):
         return "Expanded matchup metrics were neutral."
 
     return "; ".join(bits[:4]).capitalize() + "."
+
+
+def _bullpen_total_context(metric):
+    bullpen = (metric or {}).get("bullpen") or {}
+    hf = bullpen.get("home_fatigue_score")
+    af = bullpen.get("away_fatigue_score")
+    if not isinstance(hf, (int, float)) or not isinstance(af, (int, float)):
+        return "Bullpen load unavailable"
+
+    avg_fatigue = (float(hf) + float(af)) / 2.0
+    diff = abs(float(hf) - float(af))
+    if avg_fatigue >= 55:
+        return "Both bullpens taxed (RUNS+)"
+    if avg_fatigue <= 40:
+        return "Both bullpens fresh (RUNS-)"
+    if diff >= 12:
+        return "Asymmetric bullpen fatigue (RUNS+ light)"
+    return "Bullpen load mostly neutral"
+
+
+def _platoon_total_context(metric):
+    lineups = (metric or {}).get("lineups") or {}
+    hp = lineups.get("home_platoon_score")
+    ap = lineups.get("away_platoon_score")
+    if not isinstance(hp, (int, float)) or not isinstance(ap, (int, float)):
+        return "Platoon split signal unavailable"
+
+    hp = float(hp)
+    ap = float(ap)
+    if hp >= 0.55 and ap >= 0.55:
+        return "Both lineups show handedness edge (RUNS+)"
+    if hp <= 0.45 and ap <= 0.45:
+        return "Both lineups muted vs handedness (RUNS-)"
+    return "Platoon split profile mixed"
+
+
+def _umpire_total_context(umpire_summary):
+    text = str(umpire_summary or "").strip()
+    if not text or "unavailable" in text.lower():
+        return "Umpire total tendency unavailable"
+
+    hp_name = None
+    for chunk in text.split(";"):
+        c = chunk.strip()
+        if c.lower().startswith("home plate:"):
+            hp_name = c.split(":", 1)[1].strip()
+            break
+
+    if not hp_name:
+        return "Home plate umpire not identified"
+
+    lean = UMPIRE_RUN_TENDENCY.get(hp_name)
+    if lean == 1:
+        return f"Home plate umpire {hp_name} leans hitter-friendly (RUNS+)"
+    if lean == -1:
+        return f"Home plate umpire {hp_name} leans pitcher-friendly (RUNS-)"
+    return f"Home plate umpire {hp_name} has no strong run lean on file"
 
 
 def write_daily_pick_markdown(predictions, odds_data, model_name):
@@ -890,6 +958,9 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             "metrics_summary_text": _metrics_summary_for_commentary(
                 metric, winner_name, loser_name
             ),
+            "bullpen_total_context": _bullpen_total_context(metric),
+            "platoon_total_context": _platoon_total_context(metric),
+            "umpire_total_context": _umpire_total_context(ump_summary),
             "winning_pitcher": p.winning_pitcher,
             "losing_pitcher": p.losing_pitcher,
             "model_name": model_name,
@@ -926,6 +997,9 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
         lines.append(f"- **Line Movement:** {context['line_movement_text']}")
         lines.append(f"- **Total Line:** {context['total_line_text']}")
         lines.append(f"- **Total Movement:** {context['total_movement_text']}")
+        lines.append(f"- **Bullpen Total Context:** {context['bullpen_total_context']}")
+        lines.append(f"- **Platoon Total Context:** {context['platoon_total_context']}")
+        lines.append(f"- **Umpire Total Context:** {context['umpire_total_context']}")
         lines.append("")
         lines.append("**Commentary**")
         lines.append("")
