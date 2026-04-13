@@ -184,6 +184,197 @@ def save_handedness_cache(cache, path):
     path.write_text(json.dumps(cache, indent=2))
 
 
+def _lineup_batter_ids(team_blob: dict):
+    ids = []
+    for pid in (team_blob.get("battingOrder") or [])[:9]:
+        try:
+            ids.append(int(pid))
+        except Exception:
+            continue
+    return ids
+
+
+def _pitch_type_cache_path(date_str: str):
+    return Path(__file__).resolve().parents[2] / "data" / "matchup-metrics" / f"pitch-type-{date_str}.json"
+
+
+def _load_recent_pitch_type_cache(date_str: str, max_age_minutes: int = 360):
+    p = _pitch_type_cache_path(date_str)
+    if not p.exists():
+        return None
+    try:
+        payload = json.loads(p.read_text())
+    except Exception:
+        return None
+
+    gen_at = payload.get("generated_at")
+    if not gen_at:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(gen_at))
+    except Exception:
+        return None
+    age_min = (datetime.now(ET) - dt.astimezone(ET)).total_seconds() / 60.0
+    if age_min > float(max_age_minutes):
+        return None
+    return payload
+
+
+def _save_pitch_type_cache(date_str: str, payload: dict):
+    p = _pitch_type_cache_path(date_str)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(payload, indent=2))
+
+
+def _compute_pitch_type_profiles(date_str: str):
+    """Build pitcher pitch-mix usage + batter run-value by pitch type from Statcast.
+
+    Uses pybaseball.statcast and caches results to avoid repeated heavy pulls.
+    """
+    enabled = os.environ.get("ENABLE_PITCH_TYPE_FEED", "true").strip().lower() in ("1", "true", "yes", "on")
+    if not enabled:
+        return {"available": False, "reason": "disabled"}
+
+    cache = _load_recent_pitch_type_cache(date_str)
+    if cache:
+        return cache
+
+    try:
+        from pybaseball import statcast
+    except Exception:
+        return {"available": False, "reason": "pybaseball_not_installed"}
+
+    lookback_days = safe_int(os.environ.get("PITCH_TYPE_LOOKBACK_DAYS", 21)) or 21
+    start_date = (datetime.fromisoformat(date_str).date() - timedelta(days=lookback_days)).isoformat()
+
+    try:
+        df = statcast(start_dt=start_date, end_dt=date_str)
+    except Exception as e:
+        return {"available": False, "reason": f"statcast_fetch_failed:{e}"}
+
+    if df is None or len(df) == 0:
+        return {"available": False, "reason": "empty_statcast"}
+
+    required = {"pitch_type", "pitcher", "batter", "delta_run_exp"}
+    if not required.issubset(set(df.columns)):
+        return {"available": False, "reason": "missing_columns"}
+
+    # Keep only rows with a known pitch type.
+    d = df[["pitch_type", "pitcher", "batter", "delta_run_exp"]].dropna(subset=["pitch_type", "pitcher", "batter"])
+    if d.empty:
+        return {"available": False, "reason": "empty_after_filter"}
+
+    d["pitcher"] = d["pitcher"].astype(int)
+    d["batter"] = d["batter"].astype(int)
+    d["pitch_type"] = d["pitch_type"].astype(str)
+
+    # Pitcher usage by pitch type.
+    p_counts = d.groupby(["pitcher", "pitch_type"]).size().reset_index(name="n")
+    p_totals = p_counts.groupby("pitcher")["n"].sum().reset_index(name="total")
+    p_join = p_counts.merge(p_totals, on="pitcher", how="left")
+
+    pitcher_mix = {}
+    for row in p_join.itertuples(index=False):
+        pid = str(int(row.pitcher))
+        n = int(row.n)
+        total = int(row.total) if row.total else 0
+        if total <= 0:
+            continue
+        pct = n / total
+        pitcher_mix.setdefault(pid, {})[row.pitch_type] = {"pct": round(pct, 4), "count": n}
+
+    # Batter run value by pitch type (mean delta_run_exp).
+    b_grp = d.groupby(["batter", "pitch_type"])["delta_run_exp"].agg(["mean", "count"]).reset_index()
+    batter_rv = {}
+    for row in b_grp.itertuples(index=False):
+        bid = str(int(row.batter))
+        batter_rv.setdefault(bid, {})[row.pitch_type] = {
+            "rv": round(float(row.mean), 4),
+            "count": int(row.count),
+        }
+
+    payload = {
+        "available": True,
+        "generated_at": datetime.now(ET).isoformat(),
+        "date": date_str,
+        "lookback_days": lookback_days,
+        "source": "pybaseball_statcast",
+        "rows": int(len(d)),
+        "pitcher_mix": pitcher_mix,
+        "batter_rv": batter_rv,
+    }
+    _save_pitch_type_cache(date_str, payload)
+    return payload
+
+
+def _pitch_type_matchup_for_game(home_lineup_ids, away_lineup_ids, home_pitcher_id, away_pitcher_id, pitch_type_profiles):
+    if not pitch_type_profiles or not pitch_type_profiles.get("available"):
+        return None
+
+    p_mix = pitch_type_profiles.get("pitcher_mix") or {}
+    b_rv = pitch_type_profiles.get("batter_rv") or {}
+
+    def offense_score_vs_pitcher(lineup_ids, opp_pitcher_id):
+        if not lineup_ids or not opp_pitcher_id:
+            return None, {}
+        mix = p_mix.get(str(int(opp_pitcher_id))) or {}
+        if not mix:
+            return None, {}
+
+        # Use top 4 pitch types by usage.
+        top = sorted(mix.items(), key=lambda kv: kv[1].get("pct", 0), reverse=True)[:4]
+        top = [(pt, float(v.get("pct", 0))) for pt, v in top if float(v.get("pct", 0)) > 0]
+        if not top:
+            return None, {}
+
+        batter_scores = []
+        pitch_agg = {pt: [] for pt, _ in top}
+
+        for bid in lineup_ids:
+            by_type = b_rv.get(str(int(bid))) or {}
+            s = 0.0
+            w = 0.0
+            for pt, pct in top:
+                rv_obj = by_type.get(pt)
+                if not rv_obj:
+                    continue
+                rv = rv_obj.get("rv")
+                if not isinstance(rv, (int, float)):
+                    continue
+                s += float(rv) * pct
+                w += pct
+                pitch_agg[pt].append(float(rv))
+            if w > 0:
+                batter_scores.append(s / w)
+
+        if not batter_scores:
+            return None, {}
+
+        score = sum(batter_scores) / len(batter_scores)
+        vs_types = {}
+        for pt, vals in pitch_agg.items():
+            if vals:
+                vs_types[pt] = round(sum(vals) / len(vals), 4)
+        return round(score, 4), vs_types
+
+    home_score, home_vs_types = offense_score_vs_pitcher(home_lineup_ids, away_pitcher_id)
+    away_score, away_vs_types = offense_score_vs_pitcher(away_lineup_ids, home_pitcher_id)
+
+    if home_score is None and away_score is None:
+        return None
+
+    return {
+        "source": pitch_type_profiles.get("source"),
+        "lookback_days": pitch_type_profiles.get("lookback_days"),
+        "home_score": home_score,
+        "away_score": away_score,
+        "home_runs_value": home_score,
+        "away_runs_value": away_score,
+        "home_vs_types": home_vs_types,
+        "away_vs_types": away_vs_types,
+    }
+
+
 def fetch_person_handedness(player_id: int):
     data = get_json(f"https://statsapi.mlb.com/api/v1/people/{player_id}")
     people = data.get("people") or []
@@ -487,6 +678,8 @@ def build(date_str: str):
         except Exception as e:
             odds_map, odds_meta = {}, {"source": "sportspage", "used": False, "error": str(e)}
 
+    pitch_type_profiles = _compute_pitch_type_profiles(date_str)
+
     team_cache = {}
     team_adv_cache = {}
     pitcher_cache = {}
@@ -594,14 +787,26 @@ def build(date_str: str):
 
         home_throw = get_handedness(home_pitcher_id, handedness_cache).get("throw") if home_pitcher_id else None
         away_throw = get_handedness(away_pitcher_id, handedness_cache).get("throw") if away_pitcher_id else None
-        home_platoon = lineup_platoon_score((lineup_box.get("home") or {}), away_throw, handedness_cache)
-        away_platoon = lineup_platoon_score((lineup_box.get("away") or {}), home_throw, handedness_cache)
+        home_lineup_blob = (lineup_box.get("home") or {})
+        away_lineup_blob = (lineup_box.get("away") or {})
+        home_platoon = lineup_platoon_score(home_lineup_blob, away_throw, handedness_cache)
+        away_platoon = lineup_platoon_score(away_lineup_blob, home_throw, handedness_cache)
+        home_lineup_ids = _lineup_batter_ids(home_lineup_blob)
+        away_lineup_ids = _lineup_batter_ids(away_lineup_blob)
         platoon_edge = "neutral"
         if home_platoon is not None and away_platoon is not None:
             if home_platoon - away_platoon >= 0.10:
                 platoon_edge = "home"
             elif away_platoon - home_platoon >= 0.10:
                 platoon_edge = "away"
+
+        pitch_type_matchup = _pitch_type_matchup_for_game(
+            home_lineup_ids,
+            away_lineup_ids,
+            home_pitcher_id,
+            away_pitcher_id,
+            pitch_type_profiles,
+        )
 
         def pitcher_view(s):
             return {
@@ -691,6 +896,7 @@ def build(date_str: str):
                 "home_pitcher_throw_hand": home_throw,
                 "away_pitcher_throw_hand": away_throw,
             },
+            "pitch_type_matchup": pitch_type_matchup,
             "market": {
                 "source": odds_meta.get("source"),
                 "moneyline_open_home": ml_open,
@@ -723,6 +929,12 @@ def build(date_str: str):
         "generated_at": datetime.now(ET).isoformat(),
         "date": date_str,
         "odds_source": odds_meta,
+        "pitch_type_source": {
+            "available": bool(pitch_type_profiles.get("available")),
+            "source": pitch_type_profiles.get("source"),
+            "lookback_days": pitch_type_profiles.get("lookback_days"),
+            "reason": pitch_type_profiles.get("reason"),
+        },
         "count": len(matchups),
         "matchups": matchups,
     }
