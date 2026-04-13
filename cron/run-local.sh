@@ -127,6 +127,28 @@ PY
         || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Commentary polish cron trigger failed" >> "$RUN_LOG"
     fi
   fi
+
+  # Commit + push site updates from run-local (single owner for publish action).
+  SITE_REPO="$REPO_ROOT/../sportzballz.io"
+  if [[ -d "$SITE_REPO/.git" ]]; then
+    TODAY_ET="$(TZ=America/New_York date +%F)"
+    (
+      cd "$SITE_REPO"
+      git add -A
+      if [[ -n "$(git status --porcelain)" ]]; then
+        if git commit -m "Publish daily picks + OpenClaw publish $TODAY_ET" >> "$RUN_LOG" 2>&1 \
+          && git push origin main >> "$RUN_LOG" 2>&1; then
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Site commit/push complete for $TODAY_ET" >> "$RUN_LOG"
+        else
+          echo "[$(date '+%Y-%m-%d %H:%M:%S')] Site commit/push failed" >> "$RUN_LOG"
+        fi
+      else
+        echo "[$(date '+%Y-%m-%d %H:%M:%S')] No site changes to commit" >> "$RUN_LOG"
+      fi
+    )
+  else
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] Site repo not found for commit/push: $SITE_REPO" >> "$RUN_LOG"
+  fi
 else
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Failed with exit code $EXIT_CODE" >> "$RUN_LOG"
 fi
