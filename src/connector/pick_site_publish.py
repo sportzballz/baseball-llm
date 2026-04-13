@@ -817,6 +817,45 @@ def _pick_commentary_text(pick, idx, date_text=''):
     if not base:
         base = _analysis_paragraph(pick, idx, date_text)
     base = _massage_commentary_with_llm(base, pick, date_text)
+
+    # Always include the concrete metrics used to evaluate the pick.
+    metrics_parts = []
+    conf = _field(pick, 'Model Confidence', 'n/a')
+    odds = _field(pick, 'Pick Odds', 'n/a')
+    pitching = _field(pick, 'Pitching Matchup', 'n/a')
+    line_move = _field(pick, 'Line Movement', 'n/a')
+    lineups = _field(pick, 'Starting Lineups', 'n/a')
+    lineup_impact = _field(pick, 'Lineup Change Impact', 'n/a')
+    weather = _field(pick, 'Weather', 'n/a')
+    ump = _field(pick, 'Umpire Crew', 'n/a')
+
+    if conf and conf != 'n/a':
+        metrics_parts.append(f"confidence={conf}")
+    if odds and odds != 'n/a':
+        metrics_parts.append(f"odds={odds}")
+    if pitching and pitching != 'n/a':
+        metrics_parts.append(f"pitching={pitching}")
+    if line_move and line_move != 'n/a':
+        metrics_parts.append(f"line move={line_move}")
+    if weather and weather != 'n/a':
+        metrics_parts.append(f"weather={weather}")
+    if ump and ump != 'n/a':
+        metrics_parts.append(f"umpire={ump}")
+    if lineups and lineups != 'n/a':
+        metrics_parts.append(f"lineups={lineups}")
+    if lineup_impact and lineup_impact != 'n/a':
+        metrics_parts.append(f"lineup impact={lineup_impact}")
+
+    w_sig = _field(pick, f"{pick.get('winner', '')} Model Signals", '')
+    l_sig = _field(pick, f"{pick.get('loser', '')} Model Signals", '')
+    w_count = 0 if not w_sig or w_sig == 'n/a' else len([s for s in str(w_sig).split(',') if s.strip()])
+    l_count = 0 if not l_sig or l_sig == 'n/a' else len([s for s in str(l_sig).split(',') if s.strip()])
+    if w_count or l_count:
+        metrics_parts.append(f"signal count={w_count}-{l_count}")
+
+    if metrics_parts and 'evaluated metrics:' not in base.lower():
+        base = f"{base} Evaluated metrics: {'; '.join(metrics_parts)}."
+
     return _polish_commentary(base)
 
 
