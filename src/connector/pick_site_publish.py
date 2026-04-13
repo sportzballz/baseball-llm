@@ -846,15 +846,37 @@ def _pick_commentary_text(pick, idx, date_text=''):
     if lineup_impact and lineup_impact != 'n/a':
         metrics_parts.append(f"lineup impact={lineup_impact}")
 
-    w_sig = _field(pick, f"{pick.get('winner', '')} Model Signals", '')
-    l_sig = _field(pick, f"{pick.get('loser', '')} Model Signals", '')
-    w_count = 0 if not w_sig or w_sig == 'n/a' else len([s for s in str(w_sig).split(',') if s.strip()])
-    l_count = 0 if not l_sig or l_sig == 'n/a' else len([s for s in str(l_sig).split(',') if s.strip()])
+    winner = pick.get('winner', '')
+    loser = pick.get('loser', '')
+    w_sig = _field(pick, f"{winner} Model Signals", '')
+    l_sig = _field(pick, f"{loser} Model Signals", '')
+
+    w_list = [] if not w_sig or w_sig == 'n/a' else [s.strip() for s in str(w_sig).split(',') if s.strip()]
+    l_list = [] if not l_sig or l_sig == 'n/a' else [s.strip() for s in str(l_sig).split(',') if s.strip()]
+    w_count = len(w_list)
+    l_count = len(l_list)
+
     if w_count or l_count:
-        metrics_parts.append(f"signal count={w_count}-{l_count}")
+        if w_count > l_count:
+            metrics_parts.append(f"signal-count edge={winner} ({w_count}-{l_count})")
+        elif l_count > w_count:
+            metrics_parts.append(f"signal-count edge={loser} ({l_count}-{w_count})")
+        else:
+            metrics_parts.append(f"signal-count even ({w_count}-{l_count})")
+
+    def _preview(sig_list):
+        if not sig_list:
+            return 'none'
+        if len(sig_list) <= 6:
+            return ', '.join(sig_list)
+        return ', '.join(sig_list[:6]) + f" (+{len(sig_list)-6} more)"
+
+    if w_list or l_list:
+        metrics_parts.append(f"{winner} favored metrics={_preview(w_list)}")
+        metrics_parts.append(f"{loser} favored metrics={_preview(l_list)}")
 
     if metrics_parts and 'evaluated metrics:' not in base.lower():
-        base = f"{base} Evaluated metrics: {'; '.join(metrics_parts)}."
+        base = f"{base} Evaluated metrics (team-favor): {'; '.join(metrics_parts)}."
 
     return _polish_commentary(base)
 
