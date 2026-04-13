@@ -457,6 +457,8 @@ def _run_total_lean(pick):
     bullpen_total_ctx = _field(pick, 'Bullpen Total Context', '')
     platoon_total_ctx = _field(pick, 'Platoon Total Context', '')
     umpire_total_ctx = _field(pick, 'Umpire Total Context', '')
+    starter_tto_ctx = _field(pick, 'Starter TTO Context', '')
+    pitch_mix_ctx = _field(pick, 'Pitch Mix Matchup Context', '')
 
     total, over_odds, under_odds = _total_odds_pick(total_line_text)
     if total is None:
@@ -530,7 +532,13 @@ def _run_total_lean(pick):
         reasons.append('market moved total down')
 
     # Bullpen + platoon + umpire total-context nudges.
-    ctx_blob = ' | '.join([str(bullpen_total_ctx), str(platoon_total_ctx), str(umpire_total_ctx)]).lower()
+    ctx_blob = ' | '.join([
+        str(bullpen_total_ctx),
+        str(platoon_total_ctx),
+        str(umpire_total_ctx),
+        str(starter_tto_ctx),
+        str(pitch_mix_ctx),
+    ]).lower()
     if 'runs+' in ctx_blob:
         over_score += 1
         reasons.append('bullpen/platoon/umpire run context favors over')

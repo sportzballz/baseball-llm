@@ -805,6 +805,76 @@ def _umpire_total_context(umpire_summary):
     return f"Home plate umpire {hp_name} has no strong run lean on file"
 
 
+def _starter_tto_total_context(metric):
+    """Third-time-through-order risk proxy from starter quality indicators.
+    Uses available advanced stats as a practical proxy when explicit TTO splits
+    are not present in cached metrics.
+    """
+    if not metric:
+        return "Starter TTO risk unavailable"
+
+    def _risk(p):
+        adv = (((p or {}).get("advanced")) or {})
+        k9 = _safe_get(adv, ["k9"])
+        bb9 = _safe_get(adv, ["bb9"])
+        hr9 = _safe_get(adv, ["hr9"])
+        opsa = _safe_get(adv, ["ops_allowed"])
+        score = 0
+        if isinstance(k9, (int, float)) and k9 <= 7.4:
+            score += 1
+        if isinstance(bb9, (int, float)) and bb9 >= 3.0:
+            score += 1
+        if isinstance(hr9, (int, float)) and hr9 >= 1.2:
+            score += 1
+        if isinstance(opsa, (int, float)) and opsa >= 0.730:
+            score += 1
+        return score
+
+    hp = ((metric.get("home") or {}).get("probable_pitcher") or {})
+    ap = ((metric.get("away") or {}).get("probable_pitcher") or {})
+    hs = _risk(hp)
+    as_ = _risk(ap)
+
+    if hs + as_ >= 5:
+        return "Both starters project elevated third-time-through-order leakage (RUNS+)"
+    if hs + as_ <= 1:
+        return "Starters project to hold shape through deeper turns (RUNS-)"
+    if hs >= 3 or as_ >= 3:
+        return "At least one starter carries notable TTO fade risk (RUNS+ light)"
+    return "Starter TTO profile mixed"
+
+
+def _pitch_mix_matchup_total_context(metric):
+    """Pitch-mix matchup proxy using handedness/platoon + starter command.
+    """
+    if not metric:
+        return "Pitch-mix matchup context unavailable"
+
+    lineups = metric.get("lineups") or {}
+    hp = lineups.get("home_platoon_score")
+    ap = lineups.get("away_platoon_score")
+    h_adv = (((metric.get("home") or {}).get("probable_pitcher") or {}).get("advanced") or {})
+    a_adv = (((metric.get("away") or {}).get("probable_pitcher") or {}).get("advanced") or {})
+    h_kbb = h_adv.get("k_bb")
+    a_kbb = a_adv.get("k_bb")
+
+    if all(isinstance(x, (int, float)) for x in (hp, ap, h_kbb, a_kbb)):
+        hp = float(hp)
+        ap = float(ap)
+        h_kbb = float(h_kbb)
+        a_kbb = float(a_kbb)
+
+        if hp >= 0.55 and ap >= 0.55 and (h_kbb <= 2.6 or a_kbb <= 2.6):
+            return "Lineups match pitcher handedness/pitch-shape well (RUNS+)"
+        if hp <= 0.45 and ap <= 0.45 and h_kbb >= 3.4 and a_kbb >= 3.4:
+            return "Pitch-shape/command profile suppresses hard contact windows (RUNS-)"
+        if hp >= 0.55 or ap >= 0.55:
+            return "One lineup has a favorable pitch-shape/platoon fit (RUNS+ light)"
+        return "Pitch-mix matchup profile mixed"
+
+    return "Pitch-mix matchup context unavailable"
+
+
 def write_daily_pick_markdown(predictions, odds_data, model_name):
     valid = [p for p in predictions if p.winning_team != "-"]
     if not valid:
@@ -961,6 +1031,8 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             "bullpen_total_context": _bullpen_total_context(metric),
             "platoon_total_context": _platoon_total_context(metric),
             "umpire_total_context": _umpire_total_context(ump_summary),
+            "starter_tto_total_context": _starter_tto_total_context(metric),
+            "pitch_mix_total_context": _pitch_mix_matchup_total_context(metric),
             "winning_pitcher": p.winning_pitcher,
             "losing_pitcher": p.losing_pitcher,
             "model_name": model_name,
@@ -1000,6 +1072,8 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
         lines.append(f"- **Bullpen Total Context:** {context['bullpen_total_context']}")
         lines.append(f"- **Platoon Total Context:** {context['platoon_total_context']}")
         lines.append(f"- **Umpire Total Context:** {context['umpire_total_context']}")
+        lines.append(f"- **Starter TTO Context:** {context['starter_tto_total_context']}")
+        lines.append(f"- **Pitch Mix Matchup Context:** {context['pitch_mix_total_context']}")
         lines.append("")
         lines.append("**Commentary**")
         lines.append("")
