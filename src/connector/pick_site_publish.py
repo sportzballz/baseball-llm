@@ -459,6 +459,7 @@ def _run_total_lean(pick):
     umpire_total_ctx = _field(pick, 'Umpire Total Context', '')
     starter_tto_ctx = _field(pick, 'Starter TTO Context', '')
     pitch_mix_ctx = _field(pick, 'Pitch Mix Matchup Context', '')
+    pitch_type_ctx = _field(pick, 'Pitch Type Matchup Context', '')
 
     total, over_odds, under_odds = _total_odds_pick(total_line_text)
     if total is None:
@@ -538,6 +539,7 @@ def _run_total_lean(pick):
         str(umpire_total_ctx),
         str(starter_tto_ctx),
         str(pitch_mix_ctx),
+        str(pitch_type_ctx),
     ]).lower()
     if 'runs+' in ctx_blob:
         over_score += 1

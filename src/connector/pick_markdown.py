@@ -875,6 +875,54 @@ def _pitch_mix_matchup_total_context(metric):
     return "Pitch-mix matchup context unavailable"
 
 
+def _pitch_type_total_context(metric):
+    """True pitch-type matchup hook (fastball/slider/changeup/etc).
+
+    Expected (flexible) shapes in matchup-metrics feed:
+      - pitch_type_matchup.home_runs_value / away_runs_value
+      - pitch_type_matchup.home_score / away_score
+      - pitch_type_matchup.home_vs_types / away_vs_types (dict)
+    """
+    pt = (metric or {}).get("pitch_type_matchup") or {}
+    if not isinstance(pt, dict) or not pt:
+        return "Pitch-type matchup feed unavailable"
+
+    home_val = pt.get("home_runs_value")
+    away_val = pt.get("away_runs_value")
+    if not isinstance(home_val, (int, float)):
+        home_val = pt.get("home_score")
+    if not isinstance(away_val, (int, float)):
+        away_val = pt.get("away_score")
+
+    if isinstance(home_val, (int, float)) and isinstance(away_val, (int, float)):
+        hv = float(home_val)
+        av = float(away_val)
+        if hv >= 0.20 and av >= 0.20:
+            return "Both offenses project strong pitch-type run creation (RUNS+)"
+        if hv <= -0.20 and av <= -0.20:
+            return "Both offenses project muted pitch-type run creation (RUNS-)"
+        if hv >= 0.20 or av >= 0.20:
+            return "One offense shows meaningful pitch-type edge (RUNS+ light)"
+        if hv <= -0.20 or av <= -0.20:
+            return "One offense profiles weak vs projected pitch mix (RUNS- light)"
+        return "Pitch-type profile mostly neutral"
+
+    h_map = pt.get("home_vs_types") or {}
+    a_map = pt.get("away_vs_types") or {}
+    if isinstance(h_map, dict) and isinstance(a_map, dict) and h_map and a_map:
+        common = [k for k in h_map.keys() if k in a_map]
+        if common:
+            h_pos = sum(1 for k in common if isinstance(h_map.get(k), (int, float)) and float(h_map.get(k)) > 0)
+            a_pos = sum(1 for k in common if isinstance(a_map.get(k), (int, float)) and float(a_map.get(k)) > 0)
+            if h_pos >= 3 and a_pos >= 3:
+                return "Both lineups grade well across projected pitch types (RUNS+)"
+            if h_pos <= 1 and a_pos <= 1:
+                return "Both lineups struggle across projected pitch types (RUNS-)"
+            return "Pitch-type edges are one-sided/mixed"
+
+    return "Pitch-type matchup feed present but not yet normalized"
+
+
 def write_daily_pick_markdown(predictions, odds_data, model_name):
     valid = [p for p in predictions if p.winning_team != "-"]
     if not valid:
@@ -1033,6 +1081,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             "umpire_total_context": _umpire_total_context(ump_summary),
             "starter_tto_total_context": _starter_tto_total_context(metric),
             "pitch_mix_total_context": _pitch_mix_matchup_total_context(metric),
+            "pitch_type_total_context": _pitch_type_total_context(metric),
             "winning_pitcher": p.winning_pitcher,
             "losing_pitcher": p.losing_pitcher,
             "model_name": model_name,
@@ -1074,6 +1123,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
         lines.append(f"- **Umpire Total Context:** {context['umpire_total_context']}")
         lines.append(f"- **Starter TTO Context:** {context['starter_tto_total_context']}")
         lines.append(f"- **Pitch Mix Matchup Context:** {context['pitch_mix_total_context']}")
+        lines.append(f"- **Pitch Type Matchup Context:** {context['pitch_type_total_context']}")
         lines.append("")
         lines.append("**Commentary**")
         lines.append("")
