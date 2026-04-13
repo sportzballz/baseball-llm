@@ -418,6 +418,34 @@ def _total_odds_pick(total_line_text):
     return total, over_odds, under_odds
 
 
+# Coarse park-run environment mapping (proxy for park dimensions + carry characteristics).
+# Positive => tends to boost run environment; negative => suppresses run environment.
+PARK_RUN_ENV = {
+    'Coors Field': 2,
+    'Great American Ball Park': 2,
+    'Yankee Stadium': 1,
+    'Dodger Stadium': 1,
+    'Fenway Park': 1,
+    'Citizens Bank Park': 1,
+    'Wrigley Field': 1,
+    'Kauffman Stadium': 1,
+    'loanDepot park': -1,
+    'T-Mobile Park': -1,
+    'Oracle Park': -1,
+    'Petco Park': -1,
+    'Tropicana Field': -1,
+    'Comerica Park': -1,
+    'Oakland Coliseum': -1,
+}
+
+
+def _park_run_bias(venue: str):
+    v = str(venue or '').strip()
+    if not v:
+        return 0
+    return PARK_RUN_ENV.get(v, 0)
+
+
 def _run_total_lean(pick):
     winner, loser = pick['winner'], pick['loser']
     weather = _field(pick, 'Weather', '')
@@ -473,6 +501,21 @@ def _run_total_lean(pick):
     elif under_hits > over_hits:
         under_score += 1
         reasons.append('run-prevention indicator edge')
+
+    # Park factor heuristic (dimensions + environment proxy).
+    park_bias = _park_run_bias(venue)
+    if park_bias >= 2:
+        over_score += 2
+        reasons.append('park dimensions favor offense')
+    elif park_bias == 1:
+        over_score += 1
+        reasons.append('park leans hitter-friendly')
+    elif park_bias <= -2:
+        under_score += 2
+        reasons.append('park dimensions suppress scoring')
+    elif park_bias == -1:
+        under_score += 1
+        reasons.append('park leans pitcher-friendly')
 
     # Market nudge
     tm = total_move_text.lower()
