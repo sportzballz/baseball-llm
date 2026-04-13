@@ -837,8 +837,9 @@ def _build_matchup_games(game_date: str):
     return matchups
 
 
-def _evaluate_picks(parsed):
+def _evaluate_picks(parsed, frozen_totals=None):
     matchups = _build_matchup_games(parsed['date'])
+    frozen_totals = frozen_totals or {}
     seen_idx = {}
     evaluated = []
 
@@ -925,6 +926,9 @@ def _evaluate_picks(parsed):
     run_totals = []
     for ev in evaluated:
         lean = _run_total_lean(ev)
+        if lean is None:
+            key = f"{ev.get('winner', '')}|||{ev.get('loser', '')}"
+            lean = _fallback_run_total_lean_from_frozen(ev, frozen_totals.get(key))
         if not lean:
             continue
 
@@ -2462,7 +2466,10 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
                 except Exception:
                     pass
 
-    evaluated_picks, summary = _evaluate_picks(parsed)
+    totals_html = site_repo / f"{parsed['date']}-run-totals.html"
+    frozen_totals = _extract_existing_run_totals_map(totals_html)
+
+    evaluated_picks, summary = _evaluate_picks(parsed, frozen_totals)
 
     archive = _find_archive_dates(site_repo)
     if parsed['date'] not in archive:
@@ -2473,9 +2480,6 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     date_html = site_repo / f"{parsed['date']}.html"
     frozen_commentary = _extract_existing_commentary_map(date_html)
     frozen_odds = _extract_existing_odds_map(date_html)
-    totals_html = site_repo / f"{parsed['date']}-run-totals.html"
-    frozen_totals = _extract_existing_run_totals_map(totals_html)
-
     # Do not update odds once game has started or concluded.
     for p in evaluated_picks:
         key = f"{p.get('winner', '')}|||{p.get('loser', '')}"
