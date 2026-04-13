@@ -94,6 +94,18 @@ def apply_cached_metrics_to_advantage(adv_score, game_data, metrics_index, weigh
     w_bp = _weight("METRIC_WEIGHT_BULLPEN", 1.0)
     w_ctx = _weight("METRIC_WEIGHT_CONTEXT", 1.0)
 
+    # Dynamic scaling: when both lineups are announced, offense/context are more reliable.
+    lineups = metric.get("lineups") or {}
+    both_announced = bool(lineups.get("both_announced"))
+    if both_announced:
+        w_off *= 1.15
+        w_ctx *= 1.15
+        reasons.append("lineups_both_announced")
+    else:
+        w_off *= 0.80
+        w_ctx *= 0.80
+        reasons.append("lineups_incomplete")
+
     market = metric.get("market") or {}
     implied_home = _safe_float(market.get("implied_home_prob"))
     if implied_home is not None:
