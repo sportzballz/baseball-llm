@@ -223,7 +223,16 @@ def main(model, model_hitting_fn, model_pitching_fn, model_vs_fn):
                     _apply_pick_dict(w, prev)
 
             if changed_with_both_lineups == 0:
-                print("Subsequent local run: no lineup-confirmed pick changes; skipping publish")
+                print("Subsequent local run: no lineup-confirmed pick changes; refreshing existing site/dashboard")
+                try:
+                    existing_md = str(Path(__file__).resolve().parents[1] / 'picks' / f"{day_str}-pick.md")
+                    if Path(existing_md).exists():
+                        site_repo = os.environ.get('SPORTZBALLZ_SITE_REPO')
+                        published_path = publish_daily_site(existing_md, site_repo)
+                        if published_path:
+                            print(f"Refreshed picks page: {published_path}")
+                except Exception as pe:
+                    print(f"Failed to refresh existing picks site: {pe}")
                 return
             print(f"Subsequent local run: publishing {changed_with_both_lineups} lineup-confirmed pick changes")
 
