@@ -2576,34 +2576,5 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     # Apply preferred visual theme (formerly redesign 2) to primary pages.
     _apply_preferred_theme_files(site_repo, parsed['date'])
 
-    auto_publish = os.environ.get('AUTO_PUBLISH_SITE', 'true').lower() in ('1', 'true', 'yes', 'on')
-    if not auto_publish:
-        return str(date_html)
-
-    # Commit + push any changes
-    add = _run([
-        'git', 'add', 'index.html', 'dashboard.html', 'data/performance-history.json',
-        'media-kit.html', 'rate-card.html', 'contact.html', 'robots.txt', 'sitemap.xml', 'apple-touch-icon.png',
-        f"{parsed['date']}.html", f"{parsed['date']}-plus-money.html", f"{parsed['date']}-run-line.html", f"{parsed['date']}-run-totals.html"
-    ], site_repo)
-    if add.returncode != 0:
-        print(add.stderr.strip())
-        return str(date_html)
-
-    status = _run(['git', 'status', '--porcelain'], site_repo)
-    if status.returncode != 0 or not status.stdout.strip():
-        return str(date_html)
-
-    commit_msg = f"Auto-publish daily picks {parsed['date']}"
-    commit = _run(['git', 'commit', '-m', commit_msg], site_repo)
-    if commit.returncode != 0:
-        print(commit.stderr.strip() or commit.stdout.strip())
-        return str(date_html)
-
-    push = _run(['git', 'push', 'origin', 'main'], site_repo)
-    if push.returncode != 0:
-        print(push.stderr.strip() or push.stdout.strip())
-    else:
-        print(f"Auto-published site for {parsed['date']}")
-
+    # Deliberately file-write only: publishing/commit orchestration is handled upstream.
     return str(date_html)
