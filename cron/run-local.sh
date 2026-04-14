@@ -106,6 +106,24 @@ if [[ $EXIT_CODE -eq 0 ]]; then
   "$PYTHON_BIN" "$SRC_DIR/scripts/update_pending_results_html.py" >> "$RUN_LOG" 2>&1 \
     || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Pending-result HTML resolver failed (continuing)" >> "$RUN_LOG"
 
+  # 7AM ET backfill: explicitly republish yesterday to finalize outcomes + dashboard row.
+  RUN_HOUR_ET="$(TZ=America/New_York date +%H)"
+  if [[ "$RUN_HOUR_ET" == "07" ]]; then
+    YDAY_ET="$(TZ=America/New_York date -v-1d +%F)"
+    YDAY_PICK="$SRC_DIR/picks/${YDAY_ET}-pick.md"
+    if [[ -f "$YDAY_PICK" ]]; then
+      "$PYTHON_BIN" - <<PY >> "$RUN_LOG" 2>&1 || echo "[$(date '+%Y-%m-%d %H:%M:%S')] 7AM yesterday backfill failed (continuing)" >> "$RUN_LOG"
+import sys
+sys.path.append("$SRC_DIR")
+from connector.pick_site_publish import publish_daily_site
+publish_daily_site("$YDAY_PICK", "$REPO_ROOT/../sportzballz.io")
+PY
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] 7AM ET backfill complete for ${YDAY_ET}" >> "$RUN_LOG"
+    else
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] 7AM ET backfill skipped; missing ${YDAY_PICK}" >> "$RUN_LOG"
+    fi
+  fi
+
   # Ensure homepage latest tabs stay on *today* after any historical backfill refreshes.
   TODAY_ET="$(TZ=America/New_York date +%F)"
   TODAY_PICK="$SRC_DIR/picks/${TODAY_ET}-pick.md"
