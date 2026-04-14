@@ -107,6 +107,155 @@ def _extract_umpires(game_data):
     return crew
 
 
+_COVERS_WEATHER_CACHE = None
+
+
+def _to_float(val):
+    try:
+        return float(val)
+    except Exception:
+        return None
+
+
+def _norm_venue(name):
+    return re.sub(r"[^a-z0-9]", "", (name or "").lower())
+
+
+def _deg_to_compass(deg):
+    if deg is None:
+        return None
+    dirs = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
+    idx = int((float(deg) + 11.25) // 22.5) % 16
+    return dirs[idx]
+
+
+def _fetch_open_meteo_weather(game_data):
+    venue_loc = _safe_get(game_data, ["gameData", "venue", "location", "defaultCoordinates"], {}) or {}
+    lat = venue_loc.get("latitude")
+    lon = venue_loc.get("longitude")
+    game_dt_iso = _safe_get(game_data, ["gameData", "datetime", "dateTime"], None)
+    if lat is None or lon is None or not game_dt_iso:
+        return None
+
+    try:
+        et = pytz.timezone("America/New_York")
+        dt = datetime.fromisoformat(str(game_dt_iso).replace("Z", "+00:00")).astimezone(et)
+        hour = dt.replace(minute=0, second=0, microsecond=0)
+        params = {
+            "latitude": lat,
+            "longitude": lon,
+            "hourly": "temperature_2m,relative_humidity_2m,wind_speed_10m,wind_direction_10m,precipitation_probability",
+            "temperature_unit": "fahrenheit",
+            "wind_speed_unit": "mph",
+            "timezone": "America/New_York",
+            "start_hour": hour.strftime("%Y-%m-%dT%H:00"),
+            "end_hour": hour.strftime("%Y-%m-%dT%H:00"),
+        }
+        r = requests.get("https://api.open-meteo.com/v1/forecast", params=params, timeout=8)
+        r.raise_for_status()
+        h = (r.json() or {}).get("hourly") or {}
+
+        def first(name):
+            vals = h.get(name) or []
+            return vals[0] if vals else None
+
+        temp = first("temperature_2m")
+        humidity = first("relative_humidity_2m")
+        wind_mph = first("wind_speed_10m")
+        wind_dir = _deg_to_compass(first("wind_direction_10m"))
+        pop = first("precipitation_probability")
+
+        if all(v is None for v in (temp, humidity, wind_mph, pop)):
+            return None
+
+        wind_text = f"{wind_mph:.1f} mph{(' ' + wind_dir) if wind_dir else ''}" if wind_mph is not None else None
+        summary_parts = []
+        if temp is not None:
+            summary_parts.append(f"{temp:.1f}°F")
+        if wind_text:
+            summary_parts.append(f"Wind {wind_text}")
+        if humidity is not None:
+            summary_parts.append(f"Humidity {humidity:.0f}%")
+        if pop is not None:
+            summary_parts.append(f"P.O.P. {pop:.0f}%")
+
+        return {
+            "summary": ", ".join(summary_parts) + " (Open-Meteo fallback)",
+            "temp": temp,
+            "wind": wind_text,
+            "condition": None,
+        }
+    except Exception:
+        return None
+
+
+def _load_covers_weather_map():
+    global _COVERS_WEATHER_CACHE
+    if _COVERS_WEATHER_CACHE is not None:
+        return _COVERS_WEATHER_CACHE
+
+    out = {}
+    aliases = {
+        "UNIQLO Field at Dodger Stadium": "Dodger Stadium",
+    }
+
+    try:
+        html = requests.get("https://www.covers.com/sport/mlb/weather", timeout=10).text
+        pattern = re.compile(
+            r'covers-coversweatherPage-fieldName">(?P<venue>[^<]+)</div>\s*Wind:\s*(?P<wind>[0-9.]+)\s*mph.*?covers-coversweatherPage-Temp">\s*<span>(?P<temp>[0-9.]+)\s*°F</span>.*?Humidity:\s*(?P<humidity>[0-9.]+)\s*%.*?P\.O\.P\.:\s*(?P<pop>[0-9.]+)\s*%',
+            re.S,
+        )
+        for m in pattern.finditer(html):
+            venue = m.group("venue").strip()
+            item = {
+                "temp": _to_float(m.group("temp")),
+                "wind": f"{m.group('wind')} mph",
+                "humidity": _to_float(m.group("humidity")),
+                "pop": _to_float(m.group("pop")),
+            }
+            keys = {_norm_venue(venue)}
+            if venue in aliases:
+                keys.add(_norm_venue(aliases[venue]))
+            for k in keys:
+                if k and k not in out:
+                    out[k] = item
+    except Exception:
+        out = {}
+
+    _COVERS_WEATHER_CACHE = out
+    return out
+
+
+def _fetch_covers_weather(venue):
+    if not venue:
+        return None
+    lookup = _load_covers_weather_map()
+    item = lookup.get(_norm_venue(venue))
+    if not item:
+        return None
+
+    temp = item.get("temp")
+    wind = item.get("wind")
+    humidity = item.get("humidity")
+    pop = item.get("pop")
+    summary_parts = []
+    if temp is not None:
+        summary_parts.append(f"{temp:.1f}°F")
+    if wind:
+        summary_parts.append(f"Wind {wind}")
+    if humidity is not None:
+        summary_parts.append(f"Humidity {humidity:.0f}%")
+    if pop is not None:
+        summary_parts.append(f"P.O.P. {pop:.0f}%")
+
+    return {
+        "summary": ", ".join(summary_parts) + " (Covers fallback)",
+        "temp": temp,
+        "wind": wind,
+        "condition": None,
+    }
+
+
 def _extract_weather(game_data):
     weather = _safe_get(game_data, ["gameData", "weather"], {}) or {}
     venue = _safe_get(game_data, ["gameData", "venue", "name"], "Unknown Venue")
@@ -136,6 +285,17 @@ def _extract_weather(game_data):
             summary_parts.append(str(wind))
         summary = ", ".join(summary_parts)
     else:
+        # Fallback order: Open-Meteo first, Covers page as last resort.
+        fallback = _fetch_open_meteo_weather(game_data) or _fetch_covers_weather(venue)
+        if fallback:
+            return {
+                "venue": venue,
+                "dome": False,
+                "summary": fallback.get("summary") or "Weather fallback available.",
+                "temp": fallback.get("temp"),
+                "wind": fallback.get("wind"),
+                "condition": fallback.get("condition"),
+            }
         summary = "Weather data unavailable from MLB feed at run time."
 
     return {
