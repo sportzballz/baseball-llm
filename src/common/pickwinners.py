@@ -199,6 +199,7 @@ def main(model, model_hitting_fn, model_pitching_fn, model_vs_fn):
         if is_first_local_publish:
             print("Local first run of day: publishing full slate")
         else:
+            force_markdown_refresh = os.environ.get("FORCE_LOCAL_MARKDOWN_REFRESH", "false").lower() in {"1", "true", "yes", "on"}
             changed_with_both_lineups = 0
             for w in local_winners:
                 if getattr(w, "winning_team", "-") == "-":
@@ -223,17 +224,20 @@ def main(model, model_hitting_fn, model_pitching_fn, model_vs_fn):
                     _apply_pick_dict(w, prev)
 
             if changed_with_both_lineups == 0:
-                print("Subsequent local run: no lineup-confirmed pick changes; refreshing existing site/dashboard")
-                try:
-                    existing_md = str(Path(__file__).resolve().parents[1] / 'picks' / f"{day_str}-pick.md")
-                    if Path(existing_md).exists():
-                        site_repo = os.environ.get('SPORTZBALLZ_SITE_REPO')
-                        published_path = publish_daily_site(existing_md, site_repo)
-                        if published_path:
-                            print(f"Refreshed picks page: {published_path}")
-                except Exception as pe:
-                    print(f"Failed to refresh existing picks site: {pe}")
-                return
+                if force_markdown_refresh:
+                    print("Subsequent local run: no lineup-confirmed pick changes; FORCE_LOCAL_MARKDOWN_REFRESH enabled, rebuilding markdown + site")
+                else:
+                    print("Subsequent local run: no lineup-confirmed pick changes; refreshing existing site/dashboard")
+                    try:
+                        existing_md = str(Path(__file__).resolve().parents[1] / 'picks' / f"{day_str}-pick.md")
+                        if Path(existing_md).exists():
+                            site_repo = os.environ.get('SPORTZBALLZ_SITE_REPO')
+                            published_path = publish_daily_site(existing_md, site_repo)
+                            if published_path:
+                                print(f"Refreshed picks page: {published_path}")
+                    except Exception as pe:
+                        print(f"Failed to refresh existing picks site: {pe}")
+                    return
             print(f"Subsequent local run: publishing {changed_with_both_lineups} lineup-confirmed pick changes")
 
         # Write rich daily markdown commentary (weather, umpires, injuries, line movement)
