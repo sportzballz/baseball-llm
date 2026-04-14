@@ -129,6 +129,38 @@ def _deg_to_compass(deg):
     return dirs[idx]
 
 
+def _bearing_delta(a, b):
+    """Shortest signed angular delta from b -> a in degrees (-180, 180]."""
+    return (float(a) - float(b) + 540.0) % 360.0 - 180.0
+
+
+def _wind_park_effect(wind_from_deg, game_data):
+    """Infer wind context vs park orientation using venue azimuth.
+
+    MLB venue location.azimuthAngle is treated as the outfield bearing (home -> center).
+    Open-Meteo wind_direction is where wind is coming *from*.
+    """
+    if wind_from_deg is None:
+        return None
+
+    azimuth = _safe_get(game_data, ["gameData", "venue", "location", "azimuthAngle"], None)
+    if azimuth is None:
+        return None
+
+    try:
+        wind_to_deg = (float(wind_from_deg) + 180.0) % 360.0
+        delta = _bearing_delta(wind_to_deg, float(azimuth))
+        abs_delta = abs(delta)
+
+        if abs_delta <= 45:
+            return "out to CF"
+        if abs_delta >= 135:
+            return "in from CF"
+        return "crosswind to RF" if delta > 0 else "crosswind to LF"
+    except Exception:
+        return None
+
+
 def _fetch_open_meteo_weather(game_data):
     venue_loc = _safe_get(game_data, ["gameData", "venue", "location", "defaultCoordinates"], {}) or {}
     lat = venue_loc.get("latitude")
@@ -162,18 +194,21 @@ def _fetch_open_meteo_weather(game_data):
         temp = first("temperature_2m")
         humidity = first("relative_humidity_2m")
         wind_mph = first("wind_speed_10m")
-        wind_dir = _deg_to_compass(first("wind_direction_10m"))
+        wind_dir_deg = first("wind_direction_10m")
+        wind_dir = _deg_to_compass(wind_dir_deg)
+        wind_park = _wind_park_effect(wind_dir_deg, game_data)
         pop = first("precipitation_probability")
 
         if all(v is None for v in (temp, humidity, wind_mph, pop)):
             return None
 
         wind_text = f"{wind_mph:.1f} mph{(' ' + wind_dir) if wind_dir else ''}" if wind_mph is not None else None
+        wind_context = f" ({wind_park})" if wind_park else ""
         summary_parts = []
         if temp is not None:
             summary_parts.append(f"{temp:.1f}°F")
         if wind_text:
-            summary_parts.append(f"Wind {wind_text}")
+            summary_parts.append(f"Wind {wind_text}{wind_context}")
         if humidity is not None:
             summary_parts.append(f"Humidity {humidity:.0f}%")
         if pop is not None:
