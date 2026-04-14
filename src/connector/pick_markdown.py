@@ -108,6 +108,7 @@ def _extract_umpires(game_data):
 
 
 _COVERS_WEATHER_CACHE = None
+_BAT_SIDE_CACHE = {}
 
 
 def _to_float(val):
@@ -152,11 +153,19 @@ def _wind_park_effect(wind_from_deg, game_data):
         delta = _bearing_delta(wind_to_deg, float(azimuth))
         abs_delta = abs(delta)
 
-        if abs_delta <= 45:
+        # Bucket by direction relative to CF line.
+        # small delta: straight out/in; medium delta: quartering out/in toward LF/RF.
+        if abs_delta <= 30:
             return "out to CF"
-        if abs_delta >= 135:
+        if abs_delta >= 150:
             return "in from CF"
-        return "crosswind to RF" if delta > 0 else "crosswind to LF"
+
+        if 30 < abs_delta < 90:
+            return "out to RF" if delta > 0 else "out to LF"
+        if 90 <= abs_delta < 150:
+            return "in from RF" if delta > 0 else "in from LF"
+
+        return None
     except Exception:
         return None
 
@@ -538,6 +547,85 @@ def _today_lineups_by_team():
     return out
 
 
+def _player_bat_side(player_id):
+    """Return batter side code: R/L/S when available."""
+    try:
+        pid = int(player_id)
+    except Exception:
+        return None
+
+    if pid in _BAT_SIDE_CACHE:
+        return _BAT_SIDE_CACHE[pid]
+
+    side = None
+    try:
+        pdata = statsapi.get("person", {"personId": pid}) or {}
+        person = (pdata.get("people") or [{}])[0]
+        side = _safe_get(person, ["batSide", "code"], None)
+        if side:
+            side = str(side).upper().strip()
+            if side not in {"R", "L", "S"}:
+                side = None
+    except Exception:
+        side = None
+
+    _BAT_SIDE_CACHE[pid] = side
+    return side
+
+
+def _team_top_batter_handedness(team_name, lineup_ids, top_n=5):
+    ids = list(lineup_ids or [])[:top_n]
+    if not ids:
+        return None
+
+    counts = {"R": 0, "L": 0, "S": 0}
+    for pid in ids:
+        s = _player_bat_side(pid)
+        if s in counts:
+            counts[s] += 1
+
+    total = counts["R"] + counts["L"] + counts["S"]
+    if total == 0:
+        return None
+
+    return {
+        "team": team_name,
+        "R": counts["R"],
+        "L": counts["L"],
+        "S": counts["S"],
+        "top_n": top_n,
+    }
+
+
+def _top_batter_handedness_text(winner_name, loser_name, winner_lineup_ids, loser_lineup_ids):
+    w = _team_top_batter_handedness(winner_name, winner_lineup_ids)
+    l = _team_top_batter_handedness(loser_name, loser_lineup_ids)
+    if not w and not l:
+        return "Top-batter handedness unavailable (lineups not posted)."
+
+    parts = []
+    total_r = total_l = total_s = 0
+    for entry in [w, l]:
+        if not entry:
+            continue
+        parts.append(
+            f"{entry['team']} top{entry['top_n']} R{entry['R']}/L{entry['L']}/S{entry['S']}"
+        )
+        total_r += entry["R"]
+        total_l += entry["L"]
+        total_s += entry["S"]
+
+    if total_r > total_l:
+        profile = "right-heavy"
+    elif total_l > total_r:
+        profile = "left-heavy"
+    else:
+        profile = "balanced"
+
+    parts.append(f"Combined top bats R{total_r}/L{total_l}/S{total_s} ({profile})")
+    return "; ".join(parts)
+
+
 def _recent_team_games(team_id, as_of_date, max_games=RECENT_LINEUP_GAMES):
     # Pull enough history window to capture previous few completed games.
     end_date = datetime.strptime(as_of_date, "%Y-%m-%d").date() - timedelta(days=1)
@@ -586,6 +674,23 @@ def _team_lineup_and_result_for_game(game_pk, team_id):
         won = team_runs > opp_runs
 
     return lineup_ids, won
+
+
+def _fallback_recent_lineup_ids(team_id, as_of_date):
+    """Use most recent completed lineup as proxy when today's lineup isn't posted."""
+    try:
+        games = _recent_team_games(team_id, as_of_date, max_games=3)
+    except Exception:
+        games = []
+
+    for g in games:
+        game_pk = g.get("game_id")
+        if not game_pk:
+            continue
+        ids, _ = _team_lineup_and_result_for_game(game_pk, team_id)
+        if ids:
+            return ids[:9]
+    return []
 
 
 def _lineup_change_impact(team_id, team_name, today_lineup_ids, as_of_date):
@@ -1222,6 +1327,19 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             impact_parts.append(f"{loser_name}: {loser_lineup_impact}")
         lineup_change_impact = " ".join(impact_parts)
 
+        winner_lineup_ids = todays_lineups.get(winner_id, []) if winner_id else []
+        loser_lineup_ids = todays_lineups.get(loser_id, []) if loser_id else []
+        if not winner_lineup_ids and winner_id:
+            winner_lineup_ids = _fallback_recent_lineup_ids(winner_id, today)
+        if not loser_lineup_ids and loser_id:
+            loser_lineup_ids = _fallback_recent_lineup_ids(loser_id, today)
+        top_batter_handedness = _top_batter_handedness_text(
+            winner_name,
+            loser_name,
+            winner_lineup_ids,
+            loser_lineup_ids,
+        )
+
         odds_entry = odds_lookup.get(frozenset([winner_name, loser_name]))
         line_move = _extract_line_movement(odds_entry, winner_name)
         total_market = _extract_total_market(odds_entry)
@@ -1268,6 +1386,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             "winner_lineup_trend": winner_lineup_impact,
             "loser_lineup_trend": loser_lineup_impact,
             "lineup_change_impact": lineup_change_impact,
+            "top_batter_handedness": top_batter_handedness,
             "metrics_summary_text": _metrics_summary_for_commentary(
                 metric, winner_name, loser_name
             ),
@@ -1310,6 +1429,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
         lines.append(
             f"- **Lineup Change Impact:** {context['lineup_change_impact'] or 'n/a'}"
         )
+        lines.append(f"- **Top Batter Handedness:** {context['top_batter_handedness'] or 'n/a'}")
         lines.append(f"- **Line Movement:** {context['line_movement_text']}")
         lines.append(f"- **Total Line:** {context['total_line_text']}")
         lines.append(f"- **Total Movement:** {context['total_movement_text']}")

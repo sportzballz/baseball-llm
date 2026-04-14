@@ -444,6 +444,23 @@ def _park_run_bias(venue: str):
     return PARK_RUN_ENV.get(v, 0)
 
 
+def _parse_top_batter_handedness_counts(text: str):
+    """Parse combined top-batter handedness counts from markdown field.
+
+    Expected fragment example:
+      "Combined top bats R7/L3/S0 (right-heavy)"
+    """
+    t = str(text or "")
+    m = re.search(r'Combined\s+top\s+bats\s+R\s*(\d+)\s*/\s*L\s*(\d+)\s*/\s*S\s*(\d+)', t, re.I)
+    if not m:
+        return None
+    return {
+        'R': int(m.group(1)),
+        'L': int(m.group(2)),
+        'S': int(m.group(3)),
+    }
+
+
 def _run_total_lean(pick):
     winner, loser = pick['winner'], pick['loser']
     weather = _field(pick, 'Weather', '')
@@ -458,6 +475,7 @@ def _run_total_lean(pick):
     starter_tto_ctx = _field(pick, 'Starter TTO Context', '')
     pitch_mix_ctx = _field(pick, 'Pitch Mix Matchup Context', '')
     pitch_type_ctx = _field(pick, 'Pitch Type Matchup Context', '')
+    top_batter_handedness = _field(pick, 'Top Batter Handedness', '')
 
     total, over_odds, under_odds = _total_odds_pick(total_line_text)
     if total is None:
@@ -472,8 +490,8 @@ def _run_total_lean(pick):
     w = weather.lower()
     if 'dome' in w or 'roof' in w:
         reasons.append('roof-controlled environment')
-    wind_m = re.search(r'(\d+)\s*mph', w)
-    wind = int(wind_m.group(1)) if wind_m else 0
+    wind_m = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*mph', w)
+    wind = int(round(float(wind_m.group(1)))) if wind_m else 0
     if 'out to' in w and wind >= 10:
         over_score += 2
         reasons.append('wind blowing out')
@@ -481,8 +499,28 @@ def _run_total_lean(pick):
         under_score += 2
         reasons.append('wind blowing in')
 
-    temp_m = re.search(r'(\d+)°f', w)
-    temp = int(temp_m.group(1)) if temp_m else None
+    # Wind-direction + top-batter handedness interaction.
+    # Heuristic: out to LF benefits pull carry for right-handed bats;
+    # out to RF benefits pull carry for left-handed bats.
+    hand_counts = _parse_top_batter_handedness_counts(top_batter_handedness)
+    if hand_counts and wind >= 8:
+        r = hand_counts.get('R', 0)
+        l = hand_counts.get('L', 0)
+        if 'out to lf' in w and r > l:
+            over_score += 1
+            reasons.append('wind-to-lf aligns with right-handed top bats')
+        elif 'out to rf' in w and l > r:
+            over_score += 1
+            reasons.append('wind-to-rf aligns with left-handed top bats')
+        elif 'out to lf' in w and l > r:
+            under_score += 1
+            reasons.append('wind-to-lf mismatches left-heavy top bats')
+        elif 'out to rf' in w and r > l:
+            under_score += 1
+            reasons.append('wind-to-rf mismatches right-heavy top bats')
+
+    temp_m = re.search(r'([0-9]+(?:\.[0-9]+)?)°f', w)
+    temp = int(round(float(temp_m.group(1)))) if temp_m else None
     if temp is not None and temp >= 78:
         over_score += 1
         reasons.append('warm run environment')
@@ -602,8 +640,8 @@ def _weather_note(venue, weather):
     if "dome/retractable roof" in w.lower() or "not applicable" in w.lower():
         return f"At {venue}, roof conditions mute weather volatility, keeping this matchup more talent-and-execution driven."
 
-    wind_match = re.search(r'(\d+)\s*mph', w.lower())
-    wind = int(wind_match.group(1)) if wind_match else None
+    wind_match = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*mph', w.lower())
+    wind = int(round(float(wind_match.group(1)))) if wind_match else None
     if wind and wind >= 12:
         return f"Weather is a real variable here ({weather}); that wind profile can materially influence run environment and ball carry."
     if w and "unavailable" not in w.lower():
