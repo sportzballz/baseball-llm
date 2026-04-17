@@ -19,7 +19,7 @@ TOTAL_HEAD_RE = re.compile(r'^(.*?)\s+vs\s+(.*?)\s+—\s+(OVER|UNDER)\s+([0-9]+(
 OVER_HEAD_RE = re.compile(r'^(.*?)\s+vs\s+(.*?)\s+—\s+OVER\s+([0-9]+(?:\.[0-9]+)?)\s*$', re.I)
 UNDER_HEAD_RE = re.compile(r'^(.*?)\s+vs\s+(.*?)\s+—\s+UNDER\s+([0-9]+(?:\.[0-9]+)?)\s*$', re.I)
 PICK_HEAD_RE = re.compile(r'^(.*?)\s+over\s+(.*?)\s*$', re.I)
-DATE_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})(?:-plus-money|-run-line|-run-totals)?\.html$')
+DATE_RE = re.compile(r'^(\d{4}-\d{2}-\d{2})(?:-plus-money|-run-line|-run-totals)?(?:-polished)?\.html$')
 
 
 def _norm(s: str):
@@ -106,7 +106,7 @@ def update_file(path: Path, games_map: dict):
         h2 = re.sub(r'<[^>]+>', '', hm.group(1)).strip()
 
         outcome = None
-        if path.name.endswith('-run-totals.html'):
+        if '-run-totals' in path.name:
             m = TOTAL_HEAD_RE.match(h2)
             if not m:
                 m2 = OVER_HEAD_RE.match(h2)
@@ -128,7 +128,7 @@ def update_file(path: Path, games_map: dict):
                     outcome = outcome_for_total(g, direction, float(ln))
                 except Exception:
                     outcome = None
-        elif path.name.endswith('-run-line.html'):
+        elif '-run-line' in path.name:
             pair_m = re.match(r'^(.*?)\s+vs\s+(.*?)\s+—\s+Run Line Lean$', h2, re.I)
             lean_m = LEAN_SIDE_RE.search(article_html)
             if pair_m and lean_m:
@@ -191,9 +191,13 @@ def update_history_counts(modified_dates):
         if not row:
             continue
 
-        daily = SITE_REPO / f'{d}.html'
-        plus = SITE_REPO / f'{d}-plus-money.html'
-        totals = SITE_REPO / f'{d}-run-totals.html'
+        daily_polished = SITE_REPO / f'{d}-polished.html'
+        plus_polished = SITE_REPO / f'{d}-plus-money-polished.html'
+        totals_polished = SITE_REPO / f'{d}-run-totals-polished.html'
+
+        daily = daily_polished if daily_polished.exists() else (SITE_REPO / f'{d}.html')
+        plus = plus_polished if plus_polished.exists() else (SITE_REPO / f'{d}-plus-money.html')
+        totals = totals_polished if totals_polished.exists() else (SITE_REPO / f'{d}-run-totals.html')
 
         if daily.exists():
             c = count_labels_in_file(daily)
@@ -272,9 +276,13 @@ def main():
         games = fetch_results_for_date(d)
         files = [
             SITE_REPO / f'{d}.html',
+            SITE_REPO / f'{d}-polished.html',
             SITE_REPO / f'{d}-plus-money.html',
+            SITE_REPO / f'{d}-plus-money-polished.html',
             SITE_REPO / f'{d}-run-line.html',
+            SITE_REPO / f'{d}-run-line-polished.html',
             SITE_REPO / f'{d}-run-totals.html',
+            SITE_REPO / f'{d}-run-totals-polished.html',
         ]
         changed_for_date = 0
         for f in files:

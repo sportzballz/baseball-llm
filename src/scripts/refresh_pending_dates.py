@@ -11,7 +11,7 @@ SITE_REPO = REPO_ROOT.parent / "sportzballz.io"
 sys.path.append(str(SRC_DIR))
 from connector.pick_site_publish import publish_daily_site  # noqa: E402
 
-DATE_HTML_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:-plus-money|-run-line|-run-totals)?\.html$")
+DATE_HTML_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})(?:-plus-money|-run-line|-run-totals)?(?:-polished)?\.html$")
 
 
 def find_dates_with_pending(site_root: Path):

@@ -45,6 +45,22 @@ def _site_url(path: str):
     return f"{SITE_BASE_URL}{p}"
 
 
+def _daily_page_href(date_str: str, polished: bool = True):
+    return f"/{date_str}-polished.html" if polished else f"/{date_str}.html"
+
+
+def _plus_page_href(date_str: str, polished: bool = True):
+    return f"/{date_str}-plus-money-polished.html" if polished else f"/{date_str}-plus-money.html"
+
+
+def _totals_page_href(date_str: str, polished: bool = True):
+    return f"/{date_str}-run-totals-polished.html" if polished else f"/{date_str}-run-totals.html"
+
+
+def _run_line_page_href(date_str: str, polished: bool = True):
+    return f"/{date_str}-run-line-polished.html" if polished else f"/{date_str}-run-line.html"
+
+
 def _render_robots_txt():
     return f"""User-agent: *
 Allow: /
@@ -63,9 +79,9 @@ def _render_sitemap_xml(archive_dates):
     ]
 
     for d in sorted(set(archive_dates), reverse=True):
-        urls.append(_site_url(f'/{d}.html'))
-        urls.append(_site_url(f'/{d}-plus-money.html'))
-        urls.append(_site_url(f'/{d}-run-totals.html'))
+        urls.append(_site_url(_daily_page_href(d)))
+        urls.append(_site_url(_plus_page_href(d)))
+        urls.append(_site_url(_totals_page_href(d)))
 
     lines = [
         '<?xml version="1.0" encoding="UTF-8"?>',
@@ -270,9 +286,9 @@ def _toolbar_css():
 
 
 def _render_global_toolbar(latest_date: str, archive_dates):
-    latest_href = f"/{latest_date}.html"
-    latest_plus_href = f"/{latest_date}-plus-money.html"
-    latest_totals_href = f"/{latest_date}-run-totals.html"
+    latest_href = _daily_page_href(latest_date)
+    latest_plus_href = _plus_page_href(latest_date)
+    latest_totals_href = _totals_page_href(latest_date)
 
     archive_toolbar_groups = []
     for i, d in enumerate(sorted(set(archive_dates), reverse=True)):
@@ -281,9 +297,9 @@ def _render_global_toolbar(latest_date: str, archive_dates):
           <details class="archive-group">
             <summary>{d}{latest_pill}</summary>
             <div class="archive-links">
-              <a href="/{d}.html">Daily Picks</a>
-              <a href="/{d}-plus-money.html">Plus Money Picks</a>
-              <a href="/{d}-run-totals.html">Run Total Picks</a>
+              <a href="{_daily_page_href(d)}">Daily Picks</a>
+              <a href="{_plus_page_href(d)}">Plus Money Picks</a>
+              <a href="{_totals_page_href(d)}">Run Total Picks</a>
             </div>
           </details>
         ''')
@@ -291,7 +307,7 @@ def _render_global_toolbar(latest_date: str, archive_dates):
     return f'''
       <div class="nav-toolbar">
         <details class="toolbar-group">
-          <summary><a href="https://sportzballz.io">⚾ Latest Daily Picks</a></summary>
+          <summary><a href="{latest_href}">⚾ Latest Daily Picks</a></summary>
         </details>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
@@ -1485,12 +1501,12 @@ def _render_daily_html(parsed, evaluated_picks=None, summary=None, frozen_commen
   <title>SportzBallz | MLB Predictions {html.escape(date_str)} (Team vs Team)</title>
   <meta name="description" content="MLB team vs team predictions for {html.escape(date_str)} from SportzBallz, including confidence, odds, and matchup context." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
-  <link rel="canonical" href="{_site_url('/' + date_str + '.html')}" />
+  <link rel="canonical" href="{_site_url(_daily_page_href(date_str))}" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SportzBallz" />
   <meta property="og:title" content="SportzBallz MLB Predictions — {html.escape(date_str)}" />
   <meta property="og:description" content="Team vs team predictions for {html.escape(date_str)} with confidence, pricing context, plus-money and run-total analysis." />
-  <meta property="og:url" content="{_site_url('/' + date_str + '.html')}" />
+  <meta property="og:url" content="{_site_url(_daily_page_href(date_str))}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="SportzBallz MLB Predictions — {html.escape(date_str)}" />
   <meta name="twitter:description" content="Team vs team predictions for {html.escape(date_str)} with confidence, pricing context, plus-money and run-total analysis." />
@@ -1654,12 +1670,12 @@ def _render_plus_money_html(parsed, evaluated_picks=None, summary=None, frozen_c
   <title>SportzBallz | Plus Money Picks</title>
   <meta name="description" content="SportzBallz underdog MLB picks for {html.escape(date_str)}." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
-  <link rel="canonical" href="{_site_url('/' + date_str + '-plus-money.html')}" />
+  <link rel="canonical" href="{_site_url(_plus_page_href(date_str))}" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SportzBallz" />
   <meta property="og:title" content="SportzBallz Plus Money Picks — {html.escape(date_str)}" />
   <meta property="og:description" content="Underdog-only MLB picks with confidence and matchup context." />
-  <meta property="og:url" content="{_site_url('/' + date_str + '-plus-money.html')}" />
+  <meta property="og:url" content="{_site_url(_plus_page_href(date_str))}" />
   <meta name="twitter:card" content="summary_large_image" />
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#5cc9ff; --accent2:#88f2c7; --plus:#22c55e; }}
@@ -1794,12 +1810,12 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
   <title>SportzBallz | Run Total Picks</title>
   <meta name="description" content="SportzBallz MLB run total picks for {html.escape(date_str)}." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
-  <link rel="canonical" href="{_site_url('/' + date_str + '-run-totals.html')}" />
+  <link rel="canonical" href="{_site_url(_totals_page_href(date_str))}" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="SportzBallz" />
   <meta property="og:title" content="SportzBallz Run Total Picks — {html.escape(date_str)}" />
   <meta property="og:description" content="MLB totals leans built from confidence, pricing, weather and movement context." />
-  <meta property="og:url" content="{_site_url('/' + date_str + '-run-totals.html')}" />
+  <meta property="og:url" content="{_site_url(_totals_page_href(date_str))}" />
   <meta name="twitter:card" content="summary_large_image" />
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#f59e0b; --accent2:#5cc9ff; }}
@@ -1918,7 +1934,7 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
   <title>SportzBallz | Run Line Picks {html.escape(date_str)}</title>
   <meta name="description" content="MLB run line predictions for {html.escape(date_str)} from SportzBallz." />
   <meta name="robots" content="index,follow,max-image-preview:large" />
-  <link rel="canonical" href="{_site_url('/' + date_str + '-run-line.html')}" />
+  <link rel="canonical" href="{_site_url(_run_line_page_href(date_str))}" />
   <style>
     :root {{ --bg:#0a1020; --panel:#101a33; --ink:#eaf0ff; --muted:#a7b7df; --line:#273a6b; --accent:#f97316; }}
     *{{box-sizing:border-box}}
@@ -1972,9 +1988,9 @@ def _render_run_line_html(parsed, evaluated_picks=None, frozen_commentary=None, 
 
 
 def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen_commentary=None, frozen_totals=None):
-    latest_href = f"/{latest_date}.html"
-    latest_plus_href = f"/{latest_date}-plus-money.html"
-    latest_totals_href = f"/{latest_date}-run-totals.html"
+    latest_href = _daily_page_href(latest_date)
+    latest_plus_href = _plus_page_href(latest_date)
+    latest_totals_href = _totals_page_href(latest_date)
     latest_picks = latest_picks or []
     frozen_commentary = frozen_commentary or {}
     latest_stamp = datetime.now().strftime('%y-%b-%d %I:%M %p')
@@ -1987,9 +2003,9 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
           <details class="archive-group">
             <summary>{d}{latest_pill}</summary>
             <div class="archive-links">
-              <a href="/{d}.html">Daily Picks</a>
-              <a href="/{d}-plus-money.html">Plus Money Picks</a>
-              <a href="/{d}-run-totals.html">Run Total Picks</a>
+              <a href="{_daily_page_href(d)}">Daily Picks</a>
+              <a href="{_plus_page_href(d)}">Plus Money Picks</a>
+              <a href="{_totals_page_href(d)}">Run Total Picks</a>
             </div>
           </details>
         ''')
@@ -1997,9 +2013,9 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
           <details class="archive-group">
             <summary>{d}{latest_pill}</summary>
             <div class="archive-links">
-              <a href="/{d}.html">Daily Picks</a>
-              <a href="/{d}-plus-money.html">Plus Money Picks</a>
-              <a href="/{d}-run-totals.html">Run Total Picks</a>
+              <a href="{_daily_page_href(d)}">Daily Picks</a>
+              <a href="{_plus_page_href(d)}">Plus Money Picks</a>
+              <a href="{_totals_page_href(d)}">Run Total Picks</a>
             </div>
           </details>
         ''')
@@ -2196,7 +2212,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
 
       <div class="nav-toolbar">
         <details class="toolbar-group">
-          <summary><a href="https://sportzballz.io">⚾ Latest Daily Picks</a></summary>
+          <summary><a href="{latest_href}">⚾ Latest Daily Picks</a></summary>
         </details>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
@@ -2454,7 +2470,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
 
         conf_txt = f"{conf:.3f}" if conf is not None else "n/a"
         return (
-            f"<a href='/{h.get('date','')}-run-totals.html'>{winner} vs {loser} — {side} {line}</a>"
+            f"<a href='{_totals_page_href(h.get('date',''))}'>{winner} vs {loser} — {side} {line}</a>"
             f"<br><span style='color:#a7b7df;font-size:12px'>conf {conf_txt} • {result}</span>"
         )
 
@@ -2468,7 +2484,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         s_rt = _seg(h, 'run_total_picks')
         rows.append(
             f"<tr>"
-            f"<td><a href='/{d}.html'>{d}</a></td>"
+            f"<td><a href='{_daily_page_href(d)}'>{d}</a></td>"
             f"<td>{s_all.get('wins',0)}-{s_all.get('losses',0)} (${float(s_all.get('profit',0) or 0):.2f})</td>"
             f"<td>{s_best.get('wins',0)}-{s_best.get('losses',0)} (${float(s_best.get('profit',0) or 0):.2f})</td>"
             f"<td>{s_top3.get('wins',0)}-{s_top3.get('losses',0)} (${float(s_top3.get('profit',0) or 0):.2f})</td>"
