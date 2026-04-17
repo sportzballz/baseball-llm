@@ -307,7 +307,7 @@ def _render_global_toolbar(latest_date: str, archive_dates):
     return f'''
       <div class="nav-toolbar">
         <details class="toolbar-group">
-          <summary><a href="{latest_href}">⚾ Latest Daily Picks</a></summary>
+          <summary><a href="https://sportzballz.io">⚾ Latest Daily Picks</a></summary>
         </details>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
@@ -2212,7 +2212,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
 
       <div class="nav-toolbar">
         <details class="toolbar-group">
-          <summary><a href="{latest_href}">⚾ Latest Daily Picks</a></summary>
+          <summary><a href="https://sportzballz.io">⚾ Latest Daily Picks</a></summary>
         </details>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
