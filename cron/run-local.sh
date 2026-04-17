@@ -59,6 +59,7 @@ BASEBALL_POLISH_CRON_ID="${BASEBALL_POLISH_CRON_ID:-5a28aa6c-8486-469c-93a2-e762
 LOCAL_USE_LLM_FOR_INITIAL="${LOCAL_USE_LLM_FOR_INITIAL:-false}"
 REFRESH_MATCHUP_METRICS="${REFRESH_MATCHUP_METRICS:-true}"
 FORCE_LOCAL_MARKDOWN_REFRESH="${FORCE_LOCAL_MARKDOWN_REFRESH:-true}"
+RUN_LOG="$LOG_DIR/dutch-$(date '+%Y-%m-%d').log"
 
 if [[ -z "$PYTHON_BIN" ]]; then
   if [[ -x "$REPO_ROOT/.venv/bin/python" ]]; then
@@ -67,7 +68,7 @@ if [[ -z "$PYTHON_BIN" ]]; then
     PYTHON_BIN="$(command -v python3)"
   fi
 fi
-
+## BASEBALL LLM #####################################
 MODEL_ENTRY="$SRC_DIR/${MODEL}.py"
 if [[ ! -f "$MODEL_ENTRY" ]]; then
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] Unknown MODEL='$MODEL'. Expected one of: ashburn, bowa, carlton, dutch, ennis." >> "$LOG_DIR/cron-runner.log"
@@ -75,7 +76,7 @@ if [[ ! -f "$MODEL_ENTRY" ]]; then
 fi
 
 TIMESTAMP="$(date '+%Y-%m-%d %H:%M:%S')"
-RUN_LOG="$LOG_DIR/${MODEL}-$(date '+%Y-%m-%d').log"
+
 
 echo "[$TIMESTAMP] Starting model '$MODEL' with $PYTHON_BIN" >> "$RUN_LOG"
 cd "$SRC_DIR"
@@ -133,6 +134,7 @@ publish_daily_site("$TODAY_PICK", "$REPO_ROOT/../sportzballz.io")
 PY
 fi
 
+# POLISH ############################
 if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
   if [[ -z "$BASEBALL_POLISH_CRON_ID" ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Commentary polish cron id missing (BASEBALL_POLISH_CRON_ID). Skipping polish trigger." >> "$RUN_LOG"
@@ -143,14 +145,14 @@ if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
   fi
 fi
 
-sleep 120
+# PUBLISH ############################
 echo "AGS AGS AGS " >> "$RUN_LOG" 2>&1 \
   # Commit + push site updates from run-local (single owner for publish action).
 SITE_REPO="$REPO_ROOT/../sportzballz.io"
 TODAY_ET="$(TZ=America/New_York date +%F)"
 cd "$SITE_REPO"
 # Stage any new HTML files (untracked) plus existing modifications
-git add *.html 2>/dev/null || true
+git add *.html >> "$RUN_LOG" 2>&1 || true
 git commit -am "Publish daily picks + OpenClaw publish $TODAY_ET"  >> "$RUN_LOG" 2>&1 
 git push origin main >> "$RUN_LOG" 2>&1
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Site commit/push complete for $TODAY_ET" >> "$RUN_LOG"
