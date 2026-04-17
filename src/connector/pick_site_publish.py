@@ -486,17 +486,18 @@ def _run_total_lean(pick):
     under_score = 0
     reasons = []
 
-    # Weather heuristics
+    # Weather heuristics — rebalanced thresholds and weights
     w = weather.lower()
     if 'dome' in w or 'roof' in w:
         reasons.append('roof-controlled environment')
     wind_m = re.search(r'([0-9]+(?:\.[0-9]+)?)\s*mph', w)
     wind = int(round(float(wind_m.group(1)))) if wind_m else 0
-    if 'out to' in w and wind >= 10:
-        over_score += 2
+    # Raised wind threshold to 12 mph, reduced bonus to +1/-1
+    if 'out to' in w and wind >= 12:
+        over_score += 1
         reasons.append('wind blowing out')
-    if 'in from' in w and wind >= 10:
-        under_score += 2
+    if 'in from' in w and wind >= 12:
+        under_score += 1
         reasons.append('wind blowing in')
 
     # Wind-direction + top-batter handedness interaction.
@@ -521,41 +522,46 @@ def _run_total_lean(pick):
 
     temp_m = re.search(r'([0-9]+(?:\.[0-9]+)?)°f', w)
     temp = int(round(float(temp_m.group(1)))) if temp_m else None
-    if temp is not None and temp >= 78:
+    # Raised warm threshold to 85°F, lowered cool threshold to 60°F
+    if temp is not None and temp >= 85:
         over_score += 1
         reasons.append('warm run environment')
-    if temp is not None and temp <= 52:
+    if temp is not None and temp <= 60:
         under_score += 1
         reasons.append('cool run environment')
+    # Humidity suppression for UNDER
+    if 'humidity' in w:
+        hum_m = re.search(r'humidity\s+(\d+)%', w)
+        if hum_m:
+            humidity = int(hum_m.group(1))
+            if humidity >= 75:
+                under_score += 1
+                reasons.append('high humidity suppresses carry')
     if 'rain' in w:
         under_score += 1
         reasons.append('rain suppression risk')
 
-    # Signal heuristics (internal only, not exposing raw names)
+    # Signal heuristics (internal only, not exposing raw names) — weighted and capped
     over_terms = ['runs', 'homeruns', 'doubles', 'triples', 'rbi', 'runsscoredper9', 'homerunsper9', 'batters have most runs', 'batters have most home runs']
-    under_terms = ['era', 'whip', 'strikeoutsper9', 'strikepercentage', 'pitcher has fewer runs', 'pitcher has fewer earned runs', 'pitcher has fewer home runs']
+    under_terms = ['era', 'whip', 'strikeoutsper9', 'strikepercentage', 'pitcher has fewer runs', 'pitcher has fewer earned runs', 'pitcher has fewer home runs', 'strikeoutwalkratio']
 
     over_hits = sum(1 for t in over_terms if t in sig_text)
     under_hits = sum(1 for t in under_terms if t in sig_text)
-    if over_hits > under_hits:
-        over_score += 1
+    hit_diff = over_hits - under_hits
+    # Require clear edge (≥2 difference), cap at ±2
+    if hit_diff >= 2:
+        over_score += min(hit_diff, 2)
         reasons.append('offensive indicator edge')
-    elif under_hits > over_hits:
-        under_score += 1
+    elif hit_diff <= -2:
+        under_score += min(abs(hit_diff), 2)
         reasons.append('run-prevention indicator edge')
 
-    # Park factor heuristic (dimensions + environment proxy).
+    # Park factor heuristic (dimensions + environment proxy) — capped at ±1
     park_bias = _park_run_bias(venue)
-    if park_bias >= 2:
-        over_score += 2
-        reasons.append('park dimensions favor offense')
-    elif park_bias == 1:
+    if park_bias >= 1:
         over_score += 1
         reasons.append('park leans hitter-friendly')
-    elif park_bias <= -2:
-        under_score += 2
-        reasons.append('park dimensions suppress scoring')
-    elif park_bias == -1:
+    elif park_bias <= -1:
         under_score += 1
         reasons.append('park leans pitcher-friendly')
 
@@ -568,7 +574,7 @@ def _run_total_lean(pick):
         under_score += 1
         reasons.append('market moved total down')
 
-    # Bullpen + platoon + umpire total-context nudges.
+    # Bullpen + platoon + umpire total-context nudges — require multiple flags
     ctx_blob = ' | '.join([
         str(bullpen_total_ctx),
         str(platoon_total_ctx),
@@ -577,12 +583,14 @@ def _run_total_lean(pick):
         str(pitch_mix_ctx),
         str(pitch_type_ctx),
     ]).lower()
-    if 'runs+' in ctx_blob:
+    runs_plus_count = ctx_blob.count('runs+')
+    runs_minus_count = ctx_blob.count('runs-')
+    if runs_plus_count >= 2:
         over_score += 1
-        reasons.append('bullpen/platoon/umpire run context favors over')
-    if 'runs-' in ctx_blob:
+        reasons.append('run context favors over')
+    if runs_minus_count >= 2:
         under_score += 1
-        reasons.append('bullpen/platoon/umpire run context favors under')
+        reasons.append('run context favors under')
 
     if over_score == under_score:
         side = 'OVER' if (over_odds or 0) >= (under_odds or 0) else 'UNDER'
@@ -1100,11 +1108,15 @@ def _evaluate_picks(parsed, frozen_totals=None):
         is_final = bool(game.get('is_final'))
 
         chosen_odds = lean['over_odds'] if lean['pick'] == 'OVER' else lean['under_odds']
+        lean_conf = lean.get('confidence')
+        lean_conf_val = float(lean_conf) if isinstance(lean_conf, (int, float)) else (_parse_confidence(str(lean_conf)) or 0.0)
+
         rt = {
             'winner': ev.get('winner'),
             'loser': ev.get('loser'),
             'pick': lean['pick'],
             'line': lean['line'],
+            'confidence': round(lean_conf_val, 3),
             'Pick Odds': str(chosen_odds) if chosen_odds is not None else '----',
             'result': 'PENDING',
             'actual_total_side': None,
@@ -1129,12 +1141,21 @@ def _evaluate_picks(parsed, frozen_totals=None):
 
         run_totals.append(rt)
 
+    top_rt_conf = sorted(
+        run_totals,
+        key=lambda p: float(p.get('confidence', 0.0) or 0.0),
+        reverse=True,
+    )[:1]
+
+    top_rt_pick = top_rt_conf[0] if top_rt_conf else None
+
     segments = {
         'all_picks': _segment_stats(evaluated),
         'best_confidence_pick': _segment_stats(best_conf),
         'top3_confidence_picks': _segment_stats(top3_conf),
         'plus_money_picks': _segment_stats(plus),
         'run_total_picks': _segment_stats(run_totals),
+        'top_run_total_confidence_pick': _segment_stats(top_rt_conf),
     }
 
     summary = {
@@ -1151,6 +1172,16 @@ def _evaluate_picks(parsed, frozen_totals=None):
         'plus_money_losses': plus_losses,
         'plus_money_win_rate': round((plus_wins / len(plus_decided)) * 100, 1) if plus_decided else None,
         'segments': segments,
+        'top_run_total_pick': ({
+            'winner': top_rt_pick.get('winner'),
+            'loser': top_rt_pick.get('loser'),
+            'pick': top_rt_pick.get('pick'),
+            'line': top_rt_pick.get('line'),
+            'confidence': top_rt_pick.get('confidence'),
+            'odds': _odds_value(top_rt_pick.get('Pick Odds')),
+            'result': top_rt_pick.get('result'),
+            'profit': round(_profit_for_pick(top_rt_pick), 2),
+        } if top_rt_pick else None),
     }
 
     return evaluated, summary
@@ -2306,6 +2337,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         ('top3_confidence_picks', 'Top 3 Confidence Picks', '#34d399'),
         ('plus_money_picks', 'Plus Money Picks', '#f59e0b'),
         ('run_total_picks', 'Run Total Picks', '#fb7185'),
+        ('top_run_total_confidence_pick', 'Top Run Total Confidence Pick', '#22d3ee'),
     ]
 
     def _legacy_segment(h, key):
@@ -2408,6 +2440,24 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             """
         )
 
+    def _top_rt_cell(h):
+        top = h.get('top_run_total_pick') or {}
+        winner = str(top.get('winner') or '').strip()
+        loser = str(top.get('loser') or '').strip()
+        side = str(top.get('pick') or '').strip().upper()
+        line = top.get('line')
+        result = str(top.get('result') or 'PENDING').upper()
+        conf = _parse_confidence(str(top.get('confidence') or ''))
+
+        if not (winner and loser and side in ('OVER', 'UNDER') and line is not None):
+            return "—"
+
+        conf_txt = f"{conf:.3f}" if conf is not None else "n/a"
+        return (
+            f"<a href='/{h.get('date','')}-run-totals.html'>{winner} vs {loser} — {side} {line}</a>"
+            f"<br><span style='color:#a7b7df;font-size:12px'>conf {conf_txt} • {result}</span>"
+        )
+
     rows = []
     for h in history:
         d = h.get('date', '')
@@ -2424,6 +2474,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             f"<td>{s_top3.get('wins',0)}-{s_top3.get('losses',0)} (${float(s_top3.get('profit',0) or 0):.2f})</td>"
             f"<td>{s_pm.get('wins',0)}-{s_pm.get('losses',0)} (${float(s_pm.get('profit',0) or 0):.2f})</td>"
             f"<td>{s_rt.get('wins',0)}-{s_rt.get('losses',0)} (${float(s_rt.get('profit',0) or 0):.2f})</td>"
+            f"<td>{_top_rt_cell(h)}</td>"
             f"<td>{h.get('pending',0)}</td>"
             f"</tr>"
         )
@@ -2518,9 +2569,9 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     <div class="card">
       <h2 style="margin-top:0">Daily Performance</h2>
       <table>
-        <thead><tr><th>Date</th><th>All Picks</th><th>Best Confidence</th><th>Top 3 Confidence</th><th>Plus Money</th><th>Run Totals</th><th>Pending</th></tr></thead>
+        <thead><tr><th>Date</th><th>All Picks</th><th>Best Confidence</th><th>Top 3 Confidence</th><th>Plus Money</th><th>Run Totals</th><th>Top Run Total Pick</th><th>Pending</th></tr></thead>
         <tbody>
-          {''.join(rows) if rows else '<tr><td colspan="7">No history yet.</td></tr>'}
+          {''.join(rows) if rows else '<tr><td colspan="8">No history yet.</td></tr>'}
         </tbody>
       </table>
     </div>
