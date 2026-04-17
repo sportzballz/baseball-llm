@@ -272,6 +272,8 @@ def _toolbar_css():
     .toolbar-group[open] summary { margin-bottom:8px; }
     .toolbar-group summary a { color:#e6efff; text-decoration:none; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }
     .nav-toolbar > .toolbar-group > summary { min-height:44px; display:flex; align-items:center; justify-content:center; }
+    .nav-toolbar > .toolbar-direct-link { min-height:44px; display:flex; align-items:center; justify-content:center; color:#e6efff; text-decoration:none; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; border:1px solid #375486; border-radius:10px; padding:10px 12px; background:#132241; }
+    .nav-toolbar > .toolbar-direct-link:hover { border-color:var(--accent, #63d2ff); }
     .toolbar-links { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
     .toolbar-links a { color:#e7f0ff; text-decoration:none; border:1px solid #355184; border-radius:8px; padding:8px 10px; font-size:13px; background:#12203d; }
     .toolbar-links a:hover { border-color:var(--accent, #63d2ff); }
@@ -306,9 +308,7 @@ def _render_global_toolbar(latest_date: str, archive_dates):
 
     return f'''
       <div class="nav-toolbar">
-        <details class="toolbar-group">
-          <summary><a href="https://sportzballz.io">⚾ Latest Daily Picks</a></summary>
-        </details>
+        <a class="toolbar-group toolbar-direct-link" href="https://sportzballz.io">⚾ Latest Daily Picks</a>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
           {''.join(archive_toolbar_groups)}
@@ -2173,6 +2173,8 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     .toolbar-group summary::-webkit-details-marker {{ display:none; }}
     .toolbar-group[open] summary {{ margin-bottom:8px; }}
     .toolbar-group summary a {{ color:#dff0ff; text-decoration:none; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; }}
+    .nav-toolbar > .toolbar-direct-link {{ min-height:44px; display:flex; align-items:center; justify-content:center; color:#dff0ff; text-decoration:none; font-size:12px; text-transform:uppercase; letter-spacing:.08em; font-weight:800; border:1px solid #3f61a0; border-radius:10px; padding:10px 12px; background:linear-gradient(135deg, rgba(99,210,255,.18), rgba(124,255,199,.10)); }}
+    .nav-toolbar > .toolbar-direct-link:hover {{ border-color:var(--accent); }}
     .toolbar-links {{ display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }}
     .toolbar-links a {{ color:#dfeeff; text-decoration:none; border:1px solid #3b5a95; border-radius:8px; padding:7px 10px; font-size:13px; background:rgba(255,255,255,.02); }}
     .toolbar-links a:hover {{ border-color:var(--accent); }}
@@ -2211,9 +2213,7 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
       <h1 class="logo" style="display:none;">SPORT<span class="z">Z</span>BALL<span class="z">Z</span></h1>
 
       <div class="nav-toolbar">
-        <details class="toolbar-group">
-          <summary><a href="https://sportzballz.io">⚾ Latest Daily Picks</a></summary>
-        </details>
+        <a class="toolbar-group toolbar-direct-link" href="https://sportzballz.io">⚾ Latest Daily Picks</a>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
           {''.join(archive_toolbar_groups)}
