@@ -141,7 +141,10 @@ if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
   else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Triggering OpenClaw polish cron job: $BASEBALL_POLISH_CRON_ID" >> "$RUN_LOG"
     openclaw cron run "$BASEBALL_POLISH_CRON_ID" --expect-final >> "$RUN_LOG" 2>&1 \
-      || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Commentary polish cron trigger failed" >> "$RUN_LOG"
+      || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Commentary polish cron trigger failed" >> "$RUN_echo "Waiting for OpenClaw job $BASEBALL_POLISH_CRON_ID to finish..."
+    while [[ $(openclaw cron status --json | jq -r ".jobs[] | select(.id == \"$BASEBALL_POLISH_CRON_ID\") | .running") == "true" ]]; do
+      sleep 5
+    done
   fi
 fi
 
