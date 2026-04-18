@@ -309,12 +309,10 @@ def _render_global_toolbar(latest_date: str, archive_dates):
     return f'''
       <div class="nav-toolbar">
         <a class="toolbar-group toolbar-direct-link" href="https://sportzballz.io">⚾ Latest Daily Picks</a>
+        <a class="toolbar-group toolbar-direct-link" href="/dashboard.html">📊 Performance Dashboard</a>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
           {''.join(archive_toolbar_groups)}
-        </details>
-        <details class="toolbar-group">
-          <summary><a href="/dashboard.html">📊 Performance Dashboard</a></summary>
         </details>
       </div>
     '''
@@ -2214,12 +2212,10 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
 
       <div class="nav-toolbar">
         <a class="toolbar-group toolbar-direct-link" href="https://sportzballz.io">⚾ Latest Daily Picks</a>
+        <a class="toolbar-group toolbar-direct-link" href="/dashboard.html">📊 Performance Dashboard</a>
         <details class="toolbar-group">
           <summary>🗂️ Archive</summary>
           {''.join(archive_toolbar_groups)}
-        </details>
-        <details class="toolbar-group">
-          <summary><a href="/dashboard.html">📊 Performance Dashboard</a></summary>
         </details>
       </div>
     </section>

@@ -21,14 +21,15 @@ cp .env.local.example .env.local
 ./cron/run-local.sh
 ```
 
-4) **Install cron schedule** (default: daily 12:00 PM)
+4) **Install cron schedule** (default: daily 3:00 AM + 3:30 AM)
 ```bash
 ./cron/install-cron.sh
 ```
 
 Optional custom schedule:
 ```bash
-./cron/install-cron.sh "0 17 * * 1-5"   # weekdays at 5 PM
+./cron/install-cron.sh "0 17 * * 1-5"                 # one entry: weekdays at 5 PM
+./cron/install-cron.sh "0 3 * * *" "30 3 * * *"      # multiple entries
 ```
 
 Logs are written to `logs/<model>-YYYY-MM-DD.log`.

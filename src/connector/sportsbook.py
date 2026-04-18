@@ -141,11 +141,14 @@ def _odds_api_mlb(today):
                 "odds": [
                     {
                         "moneyline": {
-                            "open": {"homeOdds": home_cur, "awayOdds": away_cur},
+                            # Do not mirror current into open (that fakes "unchanged" movement).
+                            # Opening is filled later from provider data (if available) or
+                            # from first-seen snapshot persistence in _apply_opening_snapshot.
+                            "open": {"homeOdds": None, "awayOdds": None},
                             "current": {"homeOdds": home_cur, "awayOdds": away_cur},
                         },
                         "total": {
-                            "open": {"total": round(total_cur, 2) if total_cur is not None else None},
+                            "open": {"total": None},
                             "current": {
                                 "total": round(total_cur, 2) if total_cur is not None else None,
                                 "overOdds": over_cur,
@@ -158,6 +161,134 @@ def _odds_api_mlb(today):
         )
 
     return {"results": results}
+
+
+def _snapshot_file_path():
+    repo_root = Path(__file__).resolve().parents[2]
+    data_dir = repo_root / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return data_dir / "odds_open_snapshot.json"
+
+
+def _safe_read_json(path: Path):
+    try:
+        if not path.exists():
+            return {}
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _game_key(home, away):
+    if not home or not away:
+        return None
+    a, b = sorted([str(home), str(away)])
+    return f"{a}__{b}"
+
+
+def _ensure_odds_obj(result):
+    odds = result.get("odds")
+    if not isinstance(odds, list):
+        odds = []
+        result["odds"] = odds
+    if not odds:
+        odds.append({})
+    if not isinstance(odds[0], dict):
+        odds[0] = {}
+    return odds[0]
+
+
+def _apply_opening_snapshot(payload, today):
+    if not isinstance(payload, dict):
+        return payload
+
+    results = payload.get("results") or []
+    if not isinstance(results, list) or not results:
+        return payload
+
+    path = _snapshot_file_path()
+    doc = _safe_read_json(path)
+    dates = doc.get("dates") if isinstance(doc.get("dates"), dict) else {}
+    day_snap = dates.get(today) if isinstance(dates.get(today), dict) else {}
+
+    dirty = False
+
+    for r in results:
+        teams = r.get("teams") or {}
+        home = ((teams.get("home") or {}).get("team"))
+        away = ((teams.get("away") or {}).get("team"))
+        k = _game_key(home, away)
+        if not k:
+            continue
+
+        odds_obj = _ensure_odds_obj(r)
+        moneyline = odds_obj.get("moneyline") if isinstance(odds_obj.get("moneyline"), dict) else {}
+        total = odds_obj.get("total") if isinstance(odds_obj.get("total"), dict) else {}
+        ml_open = moneyline.get("open") if isinstance(moneyline.get("open"), dict) else {}
+        ml_cur = moneyline.get("current") if isinstance(moneyline.get("current"), dict) else {}
+        tot_open = total.get("open") if isinstance(total.get("open"), dict) else {}
+        tot_cur = total.get("current") if isinstance(total.get("current"), dict) else {}
+
+        snap = day_snap.get(k) if isinstance(day_snap.get(k), dict) else {}
+        snap_ml = snap.get("moneyline") if isinstance(snap.get("moneyline"), dict) else {}
+        snap_tot = snap.get("total") if isinstance(snap.get("total"), dict) else {}
+
+        cur_home = _safe_int(ml_cur.get("homeOdds"))
+        cur_away = _safe_int(ml_cur.get("awayOdds"))
+        open_home = _safe_int(ml_open.get("homeOdds"))
+        open_away = _safe_int(ml_open.get("awayOdds"))
+
+        # Fill open from provider, snapshot, or first-seen current.
+        if open_home is None:
+            open_home = _safe_int(snap_ml.get("homeOdds"))
+        if open_away is None:
+            open_away = _safe_int(snap_ml.get("awayOdds"))
+        if open_home is None and cur_home is not None:
+            open_home = cur_home
+        if open_away is None and cur_away is not None:
+            open_away = cur_away
+
+        cur_total = _safe_float(tot_cur.get("total"))
+        open_total = _safe_float(tot_open.get("total"))
+        if open_total is None:
+            open_total = _safe_float(snap_tot.get("total"))
+        if open_total is None and cur_total is not None:
+            open_total = cur_total
+
+        moneyline["open"] = {
+            "homeOdds": open_home,
+            "awayOdds": open_away,
+        }
+        if "current" not in moneyline:
+            moneyline["current"] = {"homeOdds": cur_home, "awayOdds": cur_away}
+
+        total["open"] = {"total": round(open_total, 2) if open_total is not None else None}
+        if "current" not in total:
+            total["current"] = {"total": round(cur_total, 2) if cur_total is not None else None}
+
+        odds_obj["moneyline"] = moneyline
+        odds_obj["total"] = total
+
+        next_snap = {
+            "moneyline": {
+                "homeOdds": open_home,
+                "awayOdds": open_away,
+            },
+            "total": {
+                "total": round(open_total, 2) if open_total is not None else None,
+            },
+        }
+
+        if day_snap.get(k) != next_snap:
+            day_snap[k] = next_snap
+            dirty = True
+
+    if dirty:
+        dates[today] = day_snap
+        doc["dates"] = dates
+        path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+
+    return payload
 
 
 def _sportspage_mlb(today):
@@ -178,7 +309,7 @@ def get_odds():
     try:
         odds_api = _odds_api_mlb(today)
         if odds_api and odds_api.get("results"):
-            return odds_api
+            return _apply_opening_snapshot(odds_api, today)
     except Exception:
         pass
 
@@ -203,7 +334,7 @@ def get_odds():
 
     results = data_list.get("results", []) if isinstance(data_list, dict) else []
     if results:
-        return data_list
+        return _apply_opening_snapshot(data_list, today)
 
     merged = []
     seen = set()
@@ -223,4 +354,4 @@ def get_odds():
         except Exception:
             continue
 
-    return {"results": merged}
+    return _apply_opening_snapshot({"results": merged}, today)

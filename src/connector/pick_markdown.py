@@ -301,7 +301,6 @@ def _fetch_covers_weather(venue):
 
 
 def _extract_weather(game_data):
-    weather = _safe_get(game_data, ["gameData", "weather"], {}) or {}
     venue = _safe_get(game_data, ["gameData", "venue", "name"], "Unknown Venue")
     dome = venue in DOME_VENUES
 
@@ -314,6 +313,20 @@ def _extract_weather(game_data):
             "wind": None,
             "condition": None,
         }
+
+    # Prefer game-time forecast over "current" conditions from live feed.
+    forecast = _fetch_open_meteo_weather(game_data) or _fetch_covers_weather(venue)
+    if forecast:
+        return {
+            "venue": venue,
+            "dome": False,
+            "summary": forecast.get("summary") or "Weather forecast available.",
+            "temp": forecast.get("temp"),
+            "wind": forecast.get("wind"),
+            "condition": forecast.get("condition"),
+        }
+
+    weather = _safe_get(game_data, ["gameData", "weather"], {}) or {}
 
     condition = weather.get("condition")
     temp = weather.get("temp")
@@ -329,17 +342,6 @@ def _extract_weather(game_data):
             summary_parts.append(str(wind))
         summary = ", ".join(summary_parts)
     else:
-        # Fallback order: Open-Meteo first, Covers page as last resort.
-        fallback = _fetch_open_meteo_weather(game_data) or _fetch_covers_weather(venue)
-        if fallback:
-            return {
-                "venue": venue,
-                "dome": False,
-                "summary": fallback.get("summary") or "Weather fallback available.",
-                "temp": fallback.get("temp"),
-                "wind": fallback.get("wind"),
-                "condition": fallback.get("condition"),
-            }
         summary = "Weather data unavailable from MLB feed at run time."
 
     return {
