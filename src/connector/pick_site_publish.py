@@ -483,6 +483,8 @@ def _run_total_lean(pick):
     l_sig = _field(pick, f'{loser} Model Signals', '')
     total_line_text = _field(pick, 'Total Line', '')
     total_move_text = _field(pick, 'Total Movement', '')
+    ballpark_run_history = _field(pick, 'Ballpark Run History', '')
+    savant_park_contact = _field(pick, 'Savant Park Contact Context', '')
     bullpen_total_ctx = _field(pick, 'Bullpen Total Context', '')
     platoon_total_ctx = _field(pick, 'Platoon Total Context', '')
     umpire_total_ctx = _field(pick, 'Umpire Total Context', '')
@@ -605,6 +607,59 @@ def _run_total_lean(pick):
     if runs_minus_count >= 2:
         under_score += 1
         reasons.append('run context favors under')
+
+    # Ballpark/team historical run baseline nudge.
+    # Expected markdown fragment includes: "combined baseline X.Y".
+    bh = str(ballpark_run_history or '').lower()
+    m_base = re.search(r'combined\s+baseline\s+([0-9]+(?:\.[0-9]+)?)', bh)
+    # Require at least one usable team sample in context text.
+    has_sample = bool(re.search(r'\((\d+)\s+games,\s+over\s+8\.0\s+in\s+\d+\)', bh))
+    if m_base and has_sample:
+        try:
+            baseline = float(m_base.group(1))
+        except Exception:
+            baseline = None
+        if baseline is not None:
+            # Compare baseline to current total line (instead of absolute threshold)
+            # so this adapts to today's market number.
+            if baseline >= float(total) + 0.7:
+                over_score += 1
+                reasons.append('team/park run history leans over')
+            elif baseline <= float(total) - 0.7:
+                under_score += 1
+                reasons.append('team/park run history leans under')
+
+    # Baseball Savant quality-of-contact at this park.
+    # Expected fragment includes:
+    #   "combined xwOBA 0.321; combined hard-hit 38.4%"
+    sv = str(savant_park_contact or '').lower()
+    m_xw = re.search(r'combined\s+xwoba\s+([0-9]+(?:\.[0-9]+)?)', sv)
+    m_hh = re.search(r'combined\s+hard-hit\s+([0-9]+(?:\.[0-9]+)?)%', sv)
+    if m_xw or m_hh:
+        try:
+            xw = float(m_xw.group(1)) if m_xw else None
+        except Exception:
+            xw = None
+        try:
+            hh = float(m_hh.group(1)) if m_hh else None
+        except Exception:
+            hh = None
+
+        if xw is not None:
+            if xw >= 0.335:
+                over_score += 1
+                reasons.append('savant contact quality leans over')
+            elif xw <= 0.305:
+                under_score += 1
+                reasons.append('savant contact quality leans under')
+
+        if hh is not None:
+            if hh >= 40.0:
+                over_score += 1
+                reasons.append('savant hard-hit profile leans over')
+            elif hh <= 33.0:
+                under_score += 1
+                reasons.append('savant hard-hit profile leans under')
 
     if over_score == under_score:
         side = 'OVER' if (over_odds or 0) >= (under_odds or 0) else 'UNDER'
@@ -1108,13 +1163,15 @@ def _evaluate_picks(parsed, frozen_totals=None):
     top3_conf = by_conf[:3]
 
     run_totals = []
+    rt_seen_idx = {}
     for ev in evaluated:
+        frozen_entry = _frozen_total_entry_for_pick(frozen_totals, ev, rt_seen_idx)
         lean = _run_total_lean(ev)
         if lean is None:
-            key = f"{ev.get('winner', '')}|||{ev.get('loser', '')}"
-            lean = _fallback_run_total_lean_from_frozen(ev, frozen_totals.get(key))
+            lean = _fallback_run_total_lean_from_frozen(ev, frozen_entry)
         if not lean:
             continue
+        lean = _freeze_run_total_lean_if_started(ev, lean, frozen_entry)
 
         game = ev.get('_game') or {}
         home_score = game.get('home_score')
@@ -1135,6 +1192,7 @@ def _evaluate_picks(parsed, frozen_totals=None):
             'result': 'PENDING',
             'actual_total_side': None,
             'game_total_runs': None,
+            'started_or_done': _is_game_started_or_done(ev),
         }
 
         if is_final and home_score is not None and away_score is not None:
@@ -1362,21 +1420,33 @@ def _extract_existing_run_totals_map(html_path: Path):
         except Exception:
             continue
         odds_val = _odds_value(odds_txt)
+        conf_val = _parse_confidence(conf_txt) if conf_txt not in (None, '') else None
         key = f"{winner}|||{loser}"
-        out[key] = {
+        out.setdefault(key, []).append({
             'pick': side,
             'line': line_val,
             'odds': odds_val,
-            'confidence': conf_txt,
-        }
+            'confidence': conf_val if conf_val is not None else conf_txt,
+        })
     return out
 
 
-def _freeze_run_total_lean_if_started(src_pick, lean, frozen_totals):
+def _frozen_total_entry_for_pick(frozen_totals, pick, seen_idx):
+    key = f"{pick.get('winner', '')}|||{pick.get('loser', '')}"
+    entries = (frozen_totals or {}).get(key) or []
+    if not isinstance(entries, list):
+        entries = [entries]
+    idx = seen_idx.get(key, 0)
+    seen_idx[key] = idx + 1
+    if idx < len(entries):
+        return entries[idx]
+    return entries[-1] if entries else None
+
+
+def _freeze_run_total_lean_if_started(src_pick, lean, frozen):
     if not _is_game_started_or_done(src_pick):
         return lean
-    key = f"{src_pick.get('winner', '')}|||{src_pick.get('loser', '')}"
-    frozen = (frozen_totals or {}).get(key)
+    frozen = frozen or {}
     if not frozen:
         return lean
 
@@ -1398,7 +1468,9 @@ def _freeze_run_total_lean_if_started(src_pick, lean, frozen_totals):
 
     frozen_conf = frozen.get('confidence')
     if frozen_conf not in (None, ''):
-        out['confidence'] = frozen_conf
+        conf_num = _parse_confidence(str(frozen_conf))
+        if conf_num is not None:
+            out['confidence'] = conf_num
 
     return out
 
@@ -1749,15 +1821,20 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
     source = evaluated_picks if evaluated_picks is not None else parsed['picks']
     frozen_totals = frozen_totals or {}
     leans = []
+    rt_seen_idx = {}
     for p in source:
+        frozen_entry = _frozen_total_entry_for_pick(frozen_totals, p, rt_seen_idx)
         lean = _run_total_lean(p)
         if lean is None:
-            key = f"{p.get('winner', '')}|||{p.get('loser', '')}"
-            lean = _fallback_run_total_lean_from_frozen(p, frozen_totals.get(key))
+            lean = _fallback_run_total_lean_from_frozen(p, frozen_entry)
         if lean:
+            lean = _freeze_run_total_lean_if_started(p, lean, frozen_entry)
             leans.append((p, lean))
 
-    leans.sort(key=lambda x: x[1]['confidence'], reverse=True)
+    leans.sort(
+        key=lambda x: (_parse_confidence(str(x[1].get('confidence'))) or 0.0),
+        reverse=True,
+    )
 
     date_str = parsed['date']
     latest_date = latest_date or date_str
@@ -1768,7 +1845,6 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
 
     cards = []
     for i, (src_pick, l) in enumerate(leans, 1):
-        l = _freeze_run_total_lean_if_started(src_pick, l, frozen_totals)
         price = l['over_odds'] if l['pick'] == 'OVER' else l['under_odds']
         result_label, result_class = _result_badge(src_pick, _run_total_result_for_pick(src_pick, l))
         cards.append(f'''
@@ -1783,8 +1859,9 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
           <div><span>Odds</span><strong>{_fmt_american(price)}</strong></div>
           <div><span>Confidence</span><strong>{l['confidence']}</strong></div>
           <div><span>Venue</span><strong>{html.escape(l['venue'])}</strong></div>
+          <div><span>Game Info</span><strong>{html.escape(_first_pitch_text(src_pick).replace('First pitch: ', 'Start: '))}</strong></div>
         </div>
-        <p class="lede">Run-total lens: {l['pick']} {l['line']} in {l['winner']} vs {l['loser']}. Supporting context includes {', '.join(l['reasons']) if l['reasons'] else 'balanced conditions and market context'}.</p>
+        <p class="lede">Run-total lens: {l['pick']} {l['line']} in {l['winner']} vs {l['loser']}. Confidence is driven by weather and wind context, park/run environment, team offense-vs-prevention signals, total-line movement, and supporting run indicators (bullpen/platoon/umpire/pitch mix), plus historical and Savant contact baselines. Key bearing factors here: {', '.join(l['reasons']) if l['reasons'] else 'balanced conditions and market context'}.</p>
         <details>
           <summary>Expanded total context</summary>
           <ul>
@@ -2027,13 +2104,14 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     )
     latest_plus = [p for p in latest_sorted if ((_odds_value(_field(p, 'Pick Odds', '')) or -99999) > 0)]
     latest_totals = []
+    rt_seen_idx = {}
     for p in latest_sorted:
+        frozen_entry = _frozen_total_entry_for_pick(frozen_totals, p, rt_seen_idx)
         lean = _run_total_lean(p)
         if lean is None:
-            key = f"{p.get('winner', '')}|||{p.get('loser', '')}"
-            lean = _fallback_run_total_lean_from_frozen(p, frozen_totals.get(key))
+            lean = _fallback_run_total_lean_from_frozen(p, frozen_entry)
         if lean:
-            latest_totals.append((p, lean))
+            latest_totals.append((p, lean, frozen_entry))
     def _result_badge_for(pick, result):
         return _result_badge(pick, result)
 
@@ -2108,8 +2186,8 @@ def _render_top_index(latest_date: str, archive_dates, latest_picks=None, frozen
     )
 
     total_items = []
-    for i, (p, lean) in enumerate(latest_totals, 1):
-        lean = _freeze_run_total_lean_if_started(p, lean, frozen_totals)
+    for i, (p, lean, frozen_entry) in enumerate(latest_totals, 1):
+        lean = _freeze_run_total_lean_if_started(p, lean, frozen_entry)
         line = lean.get('line')
         side = lean.get('pick')
         price = lean.get('over_odds') if side == 'OVER' else lean.get('under_odds')
@@ -2342,6 +2420,150 @@ def _upsert_history(history, summary):
     return out
 
 
+def _append_top_rt_intraday_snapshot(site_repo: Path, summary: dict):
+    """Append a timestamped snapshot of the day top run-total confidence pick."""
+    top = summary.get('top_run_total_pick') or {}
+    if not top:
+        return
+
+    data_dir = site_repo / 'data'
+    data_dir.mkdir(parents=True, exist_ok=True)
+    log_path = data_dir / 'top-run-total-intraday.jsonl'
+
+    snapshot = {
+        'timestamp_et': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'date': summary.get('date'),
+        'winner': top.get('winner'),
+        'loser': top.get('loser'),
+        'pick': top.get('pick'),
+        'line': top.get('line'),
+        'confidence': top.get('confidence'),
+        'odds': top.get('odds'),
+        'result': top.get('result'),
+        'profit': top.get('profit'),
+    }
+    with log_path.open('a', encoding='utf-8') as f:
+        f.write(json.dumps(snapshot) + '\n')
+
+
+def _build_intraday_rollups(site_repo: Path, history: list):
+    """
+    Build daily + aggregate rollups for top run-total intraday movement.
+    Returns (daily_map, aggregate_stats)
+    """
+    data_dir = site_repo / 'data'
+    log_path = data_dir / 'top-run-total-intraday.jsonl'
+    daily_out = data_dir / 'top-run-total-intraday-daily.json'
+    impact_out = data_dir / 'top-run-total-intraday-impact.json'
+
+    snapshots = []
+    if log_path.exists():
+        for line in log_path.read_text(encoding='utf-8', errors='ignore').splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                snapshots.append(json.loads(line))
+            except Exception:
+                continue
+
+    by_date = {}
+    for s in snapshots:
+        d = s.get('date')
+        if not d:
+            continue
+        by_date.setdefault(d, []).append(s)
+
+    daily = {}
+    for d, arr in by_date.items():
+        arr = sorted(arr, key=lambda x: x.get('timestamp_et', ''))
+        confs = []
+        pick_changes = 0
+        prev_key = None
+        for x in arr:
+            try:
+                c = float(x.get('confidence'))
+                confs.append(c)
+            except Exception:
+                pass
+            key = f"{x.get('winner')}|{x.get('loser')}|{x.get('pick')}|{x.get('line')}"
+            if prev_key is not None and key != prev_key:
+                pick_changes += 1
+            prev_key = key
+
+        if confs:
+            daily[d] = {
+                'date': d,
+                'snapshots': len(arr),
+                'conf_open': round(confs[0], 3),
+                'conf_close': round(confs[-1], 3),
+                'conf_max': round(max(confs), 3),
+                'conf_min': round(min(confs), 3),
+                'delta_close_open': round(confs[-1] - confs[0], 3),
+                'intraday_range': round(max(confs) - min(confs), 3),
+                'pick_changes': pick_changes,
+            }
+
+    # Join day rollups with outcomes from history for impact analysis.
+    hist_map = {h.get('date'): h for h in history}
+    joined = []
+    for d, m in daily.items():
+        h = hist_map.get(d) or {}
+        seg = (h.get('segments') or {}).get('top_run_total_confidence_pick') or {}
+        if int(seg.get('decided', 0) or 0) <= 0:
+            continue
+        profit = float(seg.get('profit', 0.0) or 0.0)
+        joined.append({
+            **m,
+            'decided': int(seg.get('decided', 0) or 0),
+            'wins': int(seg.get('wins', 0) or 0),
+            'losses': int(seg.get('losses', 0) or 0),
+            'profit': round(profit, 2),
+            'win': 1 if profit > 0 else 0,
+        })
+
+    def _bucket_delta(x):
+        if x >= 0.05:
+            return 'up_big'
+        if x <= -0.05:
+            return 'down_big'
+        return 'flat'
+
+    def _bucket_range(x):
+        if x >= 0.12:
+            return 'high_range'
+        if x >= 0.07:
+            return 'medium_range'
+        return 'low_range'
+
+    agg = {
+        'sample_days': len(joined),
+        'delta_buckets': {},
+        'range_buckets': {},
+    }
+
+    for label, key_fn, out_key in [
+        ('delta_buckets', lambda r: _bucket_delta(r['delta_close_open']), 'delta_buckets'),
+        ('range_buckets', lambda r: _bucket_range(r['intraday_range']), 'range_buckets'),
+    ]:
+        buckets = {}
+        for r in joined:
+            k = key_fn(r)
+            b = buckets.setdefault(k, {'days': 0, 'wins': 0, 'losses': 0, 'profit': 0.0})
+            b['days'] += 1
+            b['wins'] += r['wins']
+            b['losses'] += r['losses']
+            b['profit'] += r['profit']
+        for k, b in buckets.items():
+            b['win_rate_pct'] = round((b['wins'] / b['days']) * 100, 1) if b['days'] else None
+            b['profit'] = round(b['profit'], 2)
+        agg[out_key] = buckets
+
+    daily_out.write_text(json.dumps(sorted(daily.values(), key=lambda x: x['date']), indent=2))
+    impact_out.write_text(json.dumps(agg, indent=2))
+    return daily, agg
+
+
 def _render_dashboard(history, latest_date=None, archive_dates=None):
     category_defs = [
         ('all_picks', 'All Picks', '#5cc9ff'),
@@ -2452,6 +2674,136 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             """
         )
 
+    # Custom strategy chart: only bet highest-confidence run totals on Tuesdays and Thursdays
+    tt_running = 0.0
+    tt_series = []
+    tt_wins = 0
+    tt_losses = 0
+    tt_decided = 0
+    for h in asc:
+        d = h.get('date', '')
+        include = False
+        try:
+            include = datetime.strptime(d, '%Y-%m-%d').strftime('%A') in ('Tuesday', 'Thursday')
+        except Exception:
+            include = False
+        if not include:
+            continue
+        seg = _seg(h, 'top_run_total_confidence_pick')
+        decided = int(seg.get('decided', 0) or 0)
+        if decided <= 0:
+            continue
+        p = float(seg.get('profit', 0.0) or 0.0)
+        tt_running += p
+        tt_series.append(round(tt_running, 2))
+        tt_wins += int(seg.get('wins', 0) or 0)
+        tt_losses += int(seg.get('losses', 0) or 0)
+        tt_decided += decided
+
+    tt_roi = ((tt_running / (tt_decided * 100.0)) * 100.0) if tt_decided else None
+    tt_roi_txt = f"{tt_roi:.2f}%" if tt_roi is not None else '—'
+    chart_cards.append(
+        f"""
+        <div class='chart-card'>
+          <h3>Top Run Total Confidence — Tue/Thu Only</h3>
+          <div class='chart-meta'>Record: {tt_wins}-{tt_losses} • Profit: ${tt_running:.2f} • ROI: {tt_roi_txt}</div>
+          {_svg_line(tt_series, '#facc15')}
+          <div class='chart-foot'>Cumulative profit betting only Tuesdays & Thursdays (flat $100 stake)</div>
+        </div>
+        """
+    )
+
+    # Dynamic bankroll strategy: start $200, bet 50% of current bankroll on Tue/Thu top run-total confidence pick
+    br_start = 200.0
+    br = br_start
+    br_peak = br_start
+    br_max_dd = 0.0
+    br_series = [round(br_start, 2)]
+    br_bets = 0
+
+    for h in asc:
+        d = h.get('date', '')
+        include = False
+        try:
+            include = datetime.strptime(d, '%Y-%m-%d').strftime('%A') in ('Tuesday', 'Thursday')
+        except Exception:
+            include = False
+        if not include:
+            continue
+
+        seg = _seg(h, 'top_run_total_confidence_pick')
+        decided = int(seg.get('decided', 0) or 0)
+        if decided <= 0:
+            continue
+
+        # seg['profit'] is based on flat $100 stake; convert to return multiple and rescale by dynamic stake
+        profit_100 = float(seg.get('profit', 0.0) or 0.0)
+        ret_mult = profit_100 / 100.0
+
+        stake = br * 0.5
+        pnl = stake * ret_mult
+        br += pnl
+        br_bets += 1
+
+        if br > br_peak:
+            br_peak = br
+        if br_peak > 0:
+            dd = (br_peak - br) / br_peak
+            if dd > br_max_dd:
+                br_max_dd = dd
+
+        br_series.append(round(br, 2))
+
+    br_return_pct = ((br - br_start) / br_start) * 100.0 if br_start else 0.0
+    chart_cards.append(
+        f"""
+        <div class='chart-card'>
+          <h3>Tue/Thu Dynamic Bankroll (50% stake)</h3>
+          <div class='chart-meta'>Start: ${br_start:.2f} • End: ${br:.2f} • Return: {br_return_pct:.2f}% • Bets: {br_bets} • Max DD: {br_max_dd*100:.2f}%</div>
+          {_svg_line(br_series, '#60a5fa')}
+          <div class='chart-foot'>Only Tue/Thu top run-total confidence picks; each bet = 50% of current bankroll</div>
+        </div>
+        """
+    )
+
+    # Plus-money strategy chart: only Tuesday/Wednesday/Thursday plus-money picks
+    pm_twt_running = 0.0
+    pm_twt_series = []
+    pm_twt_wins = 0
+    pm_twt_losses = 0
+    pm_twt_decided = 0
+    for h in asc:
+        d = h.get('date', '')
+        include = False
+        try:
+            include = datetime.strptime(d, '%Y-%m-%d').strftime('%A') in ('Tuesday', 'Wednesday', 'Thursday')
+        except Exception:
+            include = False
+        if not include:
+            continue
+        seg = _seg(h, 'plus_money_picks')
+        decided = int(seg.get('decided', 0) or 0)
+        if decided <= 0:
+            continue
+        pm_twt_running += float(seg.get('profit', 0.0) or 0.0)
+        pm_twt_series.append(round(pm_twt_running, 2))
+        pm_twt_wins += int(seg.get('wins', 0) or 0)
+        pm_twt_losses += int(seg.get('losses', 0) or 0)
+        pm_twt_decided += decided
+
+    pm_twt_roi = ((pm_twt_running / (pm_twt_decided * 100.0)) * 100.0) if pm_twt_decided else None
+    pm_twt_roi_txt = f"{pm_twt_roi:.2f}%" if pm_twt_roi is not None else '—'
+    chart_cards.append(
+        f"""
+        <div class='chart-card'>
+          <h3>Plus Money Picks — Tue/Wed/Thu Only</h3>
+          <div class='chart-meta'>Record: {pm_twt_wins}-{pm_twt_losses} • Profit: ${pm_twt_running:.2f} • ROI: {pm_twt_roi_txt}</div>
+          {_svg_line(pm_twt_series, '#f97316')}
+          <div class='chart-foot'>Cumulative plus-money profit for bets placed only on Tue/Wed/Thu (flat $100 stake)</div>
+        </div>
+        """
+    )
+
     def _top_rt_cell(h):
         top = h.get('top_run_total_pick') or {}
         winner = str(top.get('winner') or '').strip()
@@ -2469,6 +2821,74 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             f"<a href='{_totals_page_href(h.get('date',''))}'>{winner} vs {loser} — {side} {line}</a>"
             f"<br><span style='color:#a7b7df;font-size:12px'>conf {conf_txt} • {result}</span>"
         )
+
+    # Day-of-week split for highest-confidence run total pick
+    dow_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    dow_stats = {d: {'decided': 0, 'wins': 0, 'losses': 0, 'profit': 0.0} for d in dow_order}
+    for h in history:
+        d = h.get('date', '')
+        if not d:
+            continue
+        seg = _seg(h, 'top_run_total_confidence_pick')
+        decided = int(seg.get('decided', 0) or 0)
+        if decided <= 0:
+            continue
+        try:
+            dow = datetime.strptime(d, '%Y-%m-%d').strftime('%A')
+        except Exception:
+            continue
+        if dow not in dow_stats:
+            continue
+        dow_stats[dow]['decided'] += decided
+        dow_stats[dow]['wins'] += int(seg.get('wins', 0) or 0)
+        dow_stats[dow]['losses'] += int(seg.get('losses', 0) or 0)
+        dow_stats[dow]['profit'] += float(seg.get('profit', 0.0) or 0.0)
+
+    best_dow = None
+    best_wr = -1.0
+    dow_rows = []
+    for dow in dow_order:
+        s = dow_stats[dow]
+        if s['decided'] <= 0:
+            continue
+        wr = (s['wins'] / s['decided']) * 100.0
+        if wr > best_wr:
+            best_wr = wr
+            best_dow = dow
+        dow_rows.append(
+            f"<tr><td>{dow}</td><td>{s['wins']}-{s['losses']}</td><td>{wr:.1f}%</td><td>${s['profit']:.2f}</td><td>{s['decided']}</td></tr>"
+        )
+
+    dow_best_meta = (
+        f"Best day so far: <strong>{best_dow}</strong> at <strong>{best_wr:.1f}%</strong>"
+        if best_dow is not None else
+        "No decided top run-total confidence picks yet."
+    )
+
+    # Pull latest available intraday-impact aggregate if present in history.
+    intraday_impact = None
+    for h in history:
+        if h.get('intraday_top_run_total_impact'):
+            intraday_impact = h.get('intraday_top_run_total_impact')
+            break
+
+    def _impact_rows(block):
+        if not intraday_impact:
+            return '<tr><td colspan="5">Not enough intraday data yet.</td></tr>'
+        b = intraday_impact.get(block, {}) or {}
+        order = list(b.keys())
+        if block == 'delta_buckets':
+            order = ['up_big', 'flat', 'down_big']
+        if block == 'range_buckets':
+            order = ['low_range', 'medium_range', 'high_range']
+        out = []
+        for k in order:
+            if k not in b:
+                continue
+            v = b[k]
+            wr = f"{v.get('win_rate_pct')}%" if v.get('win_rate_pct') is not None else '—'
+            out.append(f"<tr><td>{k}</td><td>{v.get('wins',0)}-{v.get('losses',0)}</td><td>{wr}</td><td>${float(v.get('profit',0) or 0):.2f}</td><td>{v.get('days',0)}</td></tr>")
+        return ''.join(out) if out else '<tr><td colspan="5">Not enough intraday data yet.</td></tr>'
 
     rows = []
     for h in history:
@@ -2576,6 +2996,38 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
       <div class="chart-grid">
         {''.join(chart_cards)}
       </div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Top Run Total Confidence Pick — Day-of-Week Split</h2>
+      <div class="meta">{dow_best_meta}</div>
+      <table>
+        <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Sample</th></tr></thead>
+        <tbody>
+          {''.join(dow_rows) if dow_rows else '<tr><td colspan="5">No history yet.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Intraday Confidence Drift Impact (Top Run Total Pick)</h2>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>By Confidence Close vs Open</h3>
+          <table>
+            <thead><tr><th>Bucket</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Days</th></tr></thead>
+            <tbody>{_impact_rows('delta_buckets')}</tbody>
+          </table>
+        </div>
+        <div class="chart-card">
+          <h3>By Intraday Confidence Range</h3>
+          <table>
+            <thead><tr><th>Bucket</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Days</th></tr></thead>
+            <tbody>{_impact_rows('range_buckets')}</tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-foot">Buckets: up_big/down_big = ±0.05 confidence move; range buckets: low &lt;0.07, medium 0.07-0.119, high ≥0.12.</div>
     </div>
 
     <div class="card">
@@ -2716,6 +3168,17 @@ def publish_daily_site(markdown_path: str, site_repo_path: str = None):
     totals_html.write_text(_render_run_totals_html(parsed, evaluated_picks, latest_global, archive, frozen_totals))
 
     history_path, history = _load_history(site_repo)
+
+    # Track intraday movement of the highest-confidence run-total pick on every publish run.
+    _append_top_rt_intraday_snapshot(site_repo, summary)
+
+    # Build intraday rollups/impact and attach today's snapshot stats into summary history row.
+    daily_rollups, impact_rollup = _build_intraday_rollups(site_repo, [h for h in history if h.get('date') != summary.get('date')] + [summary])
+    if parsed['date'] in daily_rollups:
+        summary['intraday_top_run_total'] = daily_rollups[parsed['date']]
+    if impact_rollup:
+        summary['intraday_top_run_total_impact'] = impact_rollup
+
     history = _upsert_history(history, summary)
     history_path.write_text(json.dumps(history, indent=2))
     (site_repo / 'dashboard.html').write_text(_render_dashboard(history, latest_global, archive))
