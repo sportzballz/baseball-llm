@@ -2903,6 +2903,55 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         "No decided top run-total confidence picks yet."
     )
 
+    # Day-split tables for strategy charts (auto-updated from history every render)
+    pm_strategy_days = ['Tuesday', 'Wednesday', 'Thursday']
+    pm_dow_stats = {d: {'decided': 0, 'wins': 0, 'losses': 0, 'profit': 0.0} for d in pm_strategy_days}
+    rt_ns_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+    rt_ns_stats = {d: {'decided': 0, 'wins': 0, 'losses': 0, 'profit': 0.0} for d in rt_ns_days}
+
+    for h in history:
+        d = h.get('date', '')
+        if not d:
+            continue
+        try:
+            dow = datetime.strptime(d, '%Y-%m-%d').strftime('%A')
+        except Exception:
+            continue
+
+        if dow in pm_dow_stats:
+            s = _seg(h, 'plus_money_picks')
+            dec = int(s.get('decided', 0) or 0)
+            if dec > 0:
+                pm_dow_stats[dow]['decided'] += dec
+                pm_dow_stats[dow]['wins'] += int(s.get('wins', 0) or 0)
+                pm_dow_stats[dow]['losses'] += int(s.get('losses', 0) or 0)
+                pm_dow_stats[dow]['profit'] += float(s.get('profit', 0.0) or 0.0)
+
+        if dow in rt_ns_stats:
+            s = _seg(h, 'top_run_total_confidence_pick')
+            dec = int(s.get('decided', 0) or 0)
+            if dec > 0:
+                rt_ns_stats[dow]['decided'] += dec
+                rt_ns_stats[dow]['wins'] += int(s.get('wins', 0) or 0)
+                rt_ns_stats[dow]['losses'] += int(s.get('losses', 0) or 0)
+                rt_ns_stats[dow]['profit'] += float(s.get('profit', 0.0) or 0.0)
+
+    def _dow_rows(stats, ordered_days):
+        out = []
+        for d in ordered_days:
+            s = stats.get(d, {})
+            dec = int(s.get('decided', 0) or 0)
+            if dec <= 0:
+                continue
+            wr = (int(s.get('wins', 0) or 0) / dec) * 100.0
+            out.append(
+                f"<tr><td>{d}</td><td>{int(s.get('wins',0) or 0)}-{int(s.get('losses',0) or 0)}</td><td>{wr:.1f}%</td><td>${float(s.get('profit',0.0) or 0.0):.2f}</td><td>{dec}</td></tr>"
+            )
+        return ''.join(out) if out else '<tr><td colspan="5">No history yet.</td></tr>'
+
+    pm_dow_rows = _dow_rows(pm_dow_stats, pm_strategy_days)
+    rt_ns_dow_rows = _dow_rows(rt_ns_stats, rt_ns_days)
+
     # Pull latest available intraday-impact aggregate if present in history.
     intraday_impact = None
     for h in history:
@@ -3045,6 +3094,26 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
           {''.join(dow_rows) if dow_rows else '<tr><td colspan="5">No history yet.</td></tr>'}
         </tbody>
       </table>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Strategy Day Split Tables (Auto-updated Daily)</h2>
+      <div class="chart-grid">
+        <div class="chart-card">
+          <h3>Plus Money — Tue/Wed/Thu</h3>
+          <table>
+            <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
+            <tbody>{pm_dow_rows}</tbody>
+          </table>
+        </div>
+        <div class="chart-card">
+          <h3>Top Run Total Confidence — Mon-Sat (No Sunday)</h3>
+          <table>
+            <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
+            <tbody>{rt_ns_dow_rows}</tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
     <div class="card">
