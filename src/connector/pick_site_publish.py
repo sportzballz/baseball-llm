@@ -2713,59 +2713,6 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         """
     )
 
-    # Dynamic bankroll strategy: start $200, bet 50% of current bankroll on Tue/Thu top run-total confidence pick
-    br_start = 200.0
-    br = br_start
-    br_peak = br_start
-    br_max_dd = 0.0
-    br_series = [round(br_start, 2)]
-    br_bets = 0
-
-    for h in asc:
-        d = h.get('date', '')
-        include = False
-        try:
-            include = datetime.strptime(d, '%Y-%m-%d').strftime('%A') in ('Tuesday', 'Thursday')
-        except Exception:
-            include = False
-        if not include:
-            continue
-
-        seg = _seg(h, 'top_run_total_confidence_pick')
-        decided = int(seg.get('decided', 0) or 0)
-        if decided <= 0:
-            continue
-
-        # seg['profit'] is based on flat $100 stake; convert to return multiple and rescale by dynamic stake
-        profit_100 = float(seg.get('profit', 0.0) or 0.0)
-        ret_mult = profit_100 / 100.0
-
-        stake = br * 0.5
-        pnl = stake * ret_mult
-        br += pnl
-        br_bets += 1
-
-        if br > br_peak:
-            br_peak = br
-        if br_peak > 0:
-            dd = (br_peak - br) / br_peak
-            if dd > br_max_dd:
-                br_max_dd = dd
-
-        br_series.append(round(br, 2))
-
-    br_return_pct = ((br - br_start) / br_start) * 100.0 if br_start else 0.0
-    chart_cards.append(
-        f"""
-        <div class='chart-card'>
-          <h3>Tue/Thu Dynamic Bankroll (50% stake)</h3>
-          <div class='chart-meta'>Start: ${br_start:.2f} • End: ${br:.2f} • Return: {br_return_pct:.2f}% • Bets: {br_bets} • Max DD: {br_max_dd*100:.2f}%</div>
-          {_svg_line(br_series, '#60a5fa')}
-          <div class='chart-foot'>Only Tue/Thu top run-total confidence picks; each bet = 50% of current bankroll</div>
-        </div>
-        """
-    )
-
     # Plus-money strategy chart: only Tuesday/Wednesday/Thursday plus-money picks
     pm_twt_running = 0.0
     pm_twt_series = []
