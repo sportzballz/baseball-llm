@@ -7,6 +7,9 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SRC_DIR="$REPO_ROOT/src"
 LOG_DIR="$REPO_ROOT/logs"
 LOCK_DIR="$REPO_ROOT/.run-lock"
+LOCK_PID_FILE="$LOCK_DIR/pid"
+LOCK_TS_FILE="$LOCK_DIR/started_at_epoch"
+STALE_LOCK_SECONDS="${STALE_LOCK_SECONDS:-10800}"  # 3 hours default
 
 mkdir -p "$LOG_DIR"
 
@@ -32,12 +35,42 @@ if is_invoked_by_cron; then
   exit 0
 fi
 
-# Prevent overlapping runs
-if ! mkdir "$LOCK_DIR" 2>/dev/null; then
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Another run is already in progress. Exiting." >> "$LOG_DIR/cron-runner.log"
+# Prevent overlapping runs with stale-lock auto-recovery
+acquire_lock() {
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    echo "$$" > "$LOCK_PID_FILE"
+    date +%s > "$LOCK_TS_FILE"
+    return 0
+  fi
+
+  local now pid start age
+  now="$(date +%s)"
+  pid="$(cat "$LOCK_PID_FILE" 2>/dev/null || true)"
+  start="$(cat "$LOCK_TS_FILE" 2>/dev/null || true)"
+  age=0
+  if [[ -n "$start" && "$start" =~ ^[0-9]+$ ]]; then
+    age=$((now - start))
+  fi
+
+  # If pid is missing/dead OR lock age exceeds threshold, clear stale lock.
+  if [[ -z "$pid" ]] || ! ps -p "$pid" >/dev/null 2>&1 || (( age > STALE_LOCK_SECONDS )); then
+    rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
+    if mkdir "$LOCK_DIR" 2>/dev/null; then
+      echo "$$" > "$LOCK_PID_FILE"
+      date +%s > "$LOCK_TS_FILE"
+      echo "[$(date '+%Y-%m-%d %H:%M:%S')] Cleared stale lock (old_pid=${pid:-none}, age_seconds=$age)." >> "$LOG_DIR/cron-runner.log"
+      return 0
+    fi
+  fi
+
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Another run is already in progress (pid=${pid:-unknown}, age_seconds=$age). Exiting." >> "$LOG_DIR/cron-runner.log"
+  return 1
+}
+
+if ! acquire_lock; then
   exit 0
 fi
-trap 'rmdir "$LOCK_DIR" >/dev/null 2>&1 || true' EXIT
+trap 'rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true' EXIT
 
 # Load local env if present (.env first, then .env.local override)
 # set -a auto-exports sourced variables to subprocess environment.
@@ -140,11 +173,20 @@ if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Commentary polish cron id missing (BASEBALL_POLISH_CRON_ID). Skipping polish trigger." >> "$RUN_LOG"
   else
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Triggering OpenClaw polish cron job: $BASEBALL_POLISH_CRON_ID" >> "$RUN_LOG"
-    openclaw cron run "$BASEBALL_POLISH_CRON_ID" --expect-final >> "$RUN_LOG" 2>&1 \
-      || echo "[$(date '+%Y-%m-%d %H:%M:%S')] Commentary polish cron trigger failed" >> "$RUN_echo "Waiting for OpenClaw job $BASEBALL_POLISH_CRON_ID to finish..."
-    while [[ $(openclaw cron status --json | jq -r ".jobs[] | select(.id == \"$BASEBALL_POLISH_CRON_ID\") | .running") == "true" ]]; do
-      sleep 5
-    done
+    openclaw cron run "$BASEBALL_POLISH_CRON_ID" --expect-final >> "$RUN_LOG" 2>&1 
+    # while true; do
+    #   lastRunTime=$(jq -r '.jobs[]| select(.id == "5a28aa6c-8486-469c-93a2-e7628e4138a6")| .state | .lastRunAtMs' /Users/asmith/.openclaw/cron/jobs.json)
+    #   currentTime=$(jq -n 'now * 1000 | floor')
+    #   if (( lastRunTime >= currentTime - 60000 )); then
+    #     echo "Polishing Complete!"
+    #     break;
+    #   else 
+    #     echo "$currentTime current time Polishing..."
+    #     echo "$lastRunTime last run tume Polishing..."
+    #     sleep 5
+    #   fi
+    # done
+    sleep 300
   fi
 fi
 

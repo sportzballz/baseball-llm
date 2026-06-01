@@ -2,6 +2,8 @@ import json
 import os
 import random
 import re
+import csv
+import io
 from datetime import datetime, timedelta
 
 import pytz
@@ -77,10 +79,13 @@ def _get_team_maps():
     teams = get_teams_list()
     abbr_to_name = {}
     name_to_id = {}
+    name_to_abbr = {}
     for t in teams:
-        abbr_to_name[t.abbreviation.strip().lower()] = t.name
+        abbr = t.abbreviation.strip()
+        abbr_to_name[abbr.lower()] = t.name
         name_to_id[t.name] = t.id
-    return abbr_to_name, name_to_id
+        name_to_abbr[t.name] = abbr
+    return abbr_to_name, name_to_id, name_to_abbr
 
 
 def _build_schedule_lookup(game_date):
@@ -109,6 +114,8 @@ def _extract_umpires(game_data):
 
 _COVERS_WEATHER_CACHE = None
 _BAT_SIDE_CACHE = {}
+_TEAM_PARK_RUN_CACHE = {}
+_SAVANT_TEAM_BATTING_CACHE = {}
 
 
 def _to_float(val):
@@ -695,6 +702,248 @@ def _fallback_recent_lineup_ids(team_id, as_of_date):
     return []
 
 
+def _normalize_venue_name(name):
+    return re.sub(r"[^a-z0-9]", "", str(name or "").lower())
+
+
+def _team_park_run_profile(team_id, team_name, venue_name, as_of_date, max_games=8, lookback_days=365):
+    """Return recent run-environment profile for team at a specific ballpark.
+
+    Profile is based on total game runs (team + opponent) in that venue.
+    """
+    cache_key = (team_id, _normalize_venue_name(venue_name), as_of_date, max_games, lookback_days)
+    if cache_key in _TEAM_PARK_RUN_CACHE:
+        return _TEAM_PARK_RUN_CACHE[cache_key]
+
+    if not team_id or not venue_name:
+        _TEAM_PARK_RUN_CACHE[cache_key] = None
+        return None
+
+    try:
+        as_of = datetime.strptime(as_of_date, "%Y-%m-%d").date()
+    except Exception:
+        _TEAM_PARK_RUN_CACHE[cache_key] = None
+        return None
+
+    end_date = as_of - timedelta(days=1)
+    start_date = end_date - timedelta(days=lookback_days)
+
+    try:
+        games = statsapi.schedule(
+            start_date=str(start_date),
+            end_date=str(end_date),
+            team=team_id,
+        )
+    except Exception:
+        games = []
+
+    venue_key = _normalize_venue_name(venue_name)
+    filtered = []
+    for g in games:
+        g_venue = _normalize_venue_name(g.get("venue_name"))
+        if g_venue != venue_key:
+            continue
+        home_score = g.get("home_score")
+        away_score = g.get("away_score")
+        if not isinstance(home_score, int) or not isinstance(away_score, int):
+            continue
+        total_runs = home_score + away_score
+        filtered.append({
+            "total_runs": total_runs,
+            "line_hint_over8": total_runs > 8,
+            "game_datetime": g.get("game_datetime") or "",
+        })
+
+    filtered = sorted(filtered, key=lambda x: x.get("game_datetime") or "", reverse=True)
+    sample = filtered[:max_games]
+    if not sample:
+        _TEAM_PARK_RUN_CACHE[cache_key] = None
+        return None
+
+    totals = [x["total_runs"] for x in sample]
+    avg_total = round(sum(totals) / len(totals), 2)
+    over8_count = sum(1 for x in sample if x["line_hint_over8"])
+    out = {
+        "team": team_name,
+        "venue": venue_name,
+        "games": len(sample),
+        "avg_total": avg_total,
+        "over8_count": over8_count,
+    }
+    _TEAM_PARK_RUN_CACHE[cache_key] = out
+    return out
+
+
+def _ballpark_run_history_text(winner_id, winner_name, loser_id, loser_name, venue_name, as_of_date):
+    """Summarize recent run totals for each team at this ballpark."""
+    wp = _team_park_run_profile(winner_id, winner_name, venue_name, as_of_date)
+    lp = _team_park_run_profile(loser_id, loser_name, venue_name, as_of_date)
+    if not wp and not lp:
+        return "Ballpark run history unavailable."
+
+    parts = []
+    baselines = []
+    if wp:
+        parts.append(
+            f"{winner_name}: avg total {wp['avg_total']} ({wp['games']} games, over 8.0 in {wp['over8_count']})"
+        )
+        baselines.append(float(wp["avg_total"]))
+    if lp:
+        parts.append(
+            f"{loser_name}: avg total {lp['avg_total']} ({lp['games']} games, over 8.0 in {lp['over8_count']})"
+        )
+        baselines.append(float(lp["avg_total"]))
+
+    if baselines:
+        combined = round(sum(baselines) / len(baselines), 2)
+        parts.append(f"combined baseline {combined}")
+
+    return f"{venue_name} trends — " + "; ".join(parts) + "."
+
+
+def _fetch_savant_team_batting_rows(team_abbr, start_date, end_date):
+    """Fetch statcast rows for a team from Baseball Savant CSV endpoint.
+
+    We use this to derive park-specific quality-of-contact context for run totals.
+    """
+    key = (str(team_abbr or "").upper(), str(start_date), str(end_date))
+    if key in _SAVANT_TEAM_BATTING_CACHE:
+        return _SAVANT_TEAM_BATTING_CACHE[key]
+
+    team = key[0]
+    if not team:
+        _SAVANT_TEAM_BATTING_CACHE[key] = []
+        return []
+
+    url = "https://baseballsavant.mlb.com/statcast_search/csv"
+    # Keep params minimal; over-constraining this endpoint can return header-only CSV.
+    params = {
+        "all": "true",
+        "type": "details",
+        "team": team,
+        "game_date_gt": start_date,
+        "game_date_lt": end_date,
+    }
+
+    rows = []
+    try:
+        resp = requests.get(url, params=params, timeout=25)
+        resp.raise_for_status()
+        text = (resp.text or "").lstrip("\ufeff")
+        if text.strip().startswith('"pitch_type"'):
+            reader = csv.DictReader(io.StringIO(text))
+            rows = [r for r in reader if isinstance(r, dict)]
+    except Exception:
+        rows = []
+
+    _SAVANT_TEAM_BATTING_CACHE[key] = rows
+    return rows
+
+
+def _savant_batting_team_for_row(row):
+    inning_half = str(row.get("inning_topbot") or "").strip().lower()
+    home_team = str(row.get("home_team") or "").strip().upper()
+    away_team = str(row.get("away_team") or "").strip().upper()
+    if inning_half == "top":
+        return away_team
+    if inning_half == "bot":
+        return home_team
+    return ""
+
+
+def _savant_team_park_contact_profile(team_abbr, park_home_abbr, as_of_date, lookback_days=60):
+    """Compute team quality-of-contact profile at a specific park from Savant."""
+    team = str(team_abbr or "").upper()
+    park = str(park_home_abbr or "").upper()
+    if not team or not park:
+        return None
+
+    try:
+        as_of = datetime.strptime(as_of_date, "%Y-%m-%d").date()
+    except Exception:
+        return None
+
+    start = str(as_of - timedelta(days=lookback_days))
+    end = str(as_of)
+    rows = _fetch_savant_team_batting_rows(team, start, end)
+    if not rows:
+        return None
+
+    xwoba_vals = []
+    hard_hit = 0
+    total_bbe = 0
+
+    for r in rows:
+        home_team = str(r.get("home_team") or "").strip().upper()
+        batting_team = _savant_batting_team_for_row(r)
+        if home_team != park or batting_team != team:
+            continue
+
+        xwoba = _to_float(r.get("estimated_woba_using_speedangle"))
+        ev = _to_float(r.get("launch_speed"))
+        if xwoba is None and ev is None:
+            continue
+
+        total_bbe += 1
+        if xwoba is not None:
+            xwoba_vals.append(float(xwoba))
+        if ev is not None and ev >= 95.0:
+            hard_hit += 1
+
+    if total_bbe == 0:
+        return None
+
+    avg_xwoba = None
+    if xwoba_vals:
+        avg_xwoba = round(sum(xwoba_vals) / len(xwoba_vals), 3)
+
+    hard_hit_rate = round((hard_hit / total_bbe) * 100.0, 1)
+    return {
+        "team": team,
+        "park": park,
+        "sample": total_bbe,
+        "xwoba": avg_xwoba,
+        "hard_hit_rate": hard_hit_rate,
+    }
+
+
+def _savant_park_contact_context(winner_name, winner_abbr, loser_name, loser_abbr, park_home_abbr, venue_name, as_of_date):
+    """Build markdown-safe Savant context line for totals modeling."""
+    w = _savant_team_park_contact_profile(winner_abbr, park_home_abbr, as_of_date)
+    l = _savant_team_park_contact_profile(loser_abbr, park_home_abbr, as_of_date)
+    if not w and not l:
+        return "Savant park contact context unavailable."
+
+    parts = []
+    xwoba_vals = []
+    hh_vals = []
+
+    if w:
+        x = "n/a" if w.get("xwoba") is None else f"{w['xwoba']:.3f}"
+        parts.append(
+            f"{winner_name}: xwOBA {x}, hard-hit {w['hard_hit_rate']:.1f}% ({w['sample']} BBE)"
+        )
+        if w.get("xwoba") is not None:
+            xwoba_vals.append(float(w["xwoba"]))
+        hh_vals.append(float(w["hard_hit_rate"]))
+
+    if l:
+        x = "n/a" if l.get("xwoba") is None else f"{l['xwoba']:.3f}"
+        parts.append(
+            f"{loser_name}: xwOBA {x}, hard-hit {l['hard_hit_rate']:.1f}% ({l['sample']} BBE)"
+        )
+        if l.get("xwoba") is not None:
+            xwoba_vals.append(float(l["xwoba"]))
+        hh_vals.append(float(l["hard_hit_rate"]))
+
+    if xwoba_vals:
+        parts.append(f"combined xwOBA {sum(xwoba_vals)/len(xwoba_vals):.3f}")
+    if hh_vals:
+        parts.append(f"combined hard-hit {sum(hh_vals)/len(hh_vals):.1f}%")
+
+    return f"{venue_name} Savant contact — " + "; ".join(parts) + "."
+
+
 def _lineup_change_impact(team_id, team_name, today_lineup_ids, as_of_date):
     if not today_lineup_ids:
         return ""
@@ -1234,7 +1483,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
     today = str(datetime.now(eastern).date())
     metrics_index = load_cached_metrics(today)
 
-    abbr_to_name, name_to_id = _get_team_maps()
+    abbr_to_name, name_to_id, name_to_abbr = _get_team_maps()
     schedule = _build_schedule_lookup(today)
     todays_lineups = _today_lineups_by_team()
 
@@ -1276,10 +1525,14 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
 
         winner_name = abbr_to_name.get(winner_abbr, winner_abbr.upper())
         loser_name = abbr_to_name.get(loser_abbr, loser_abbr.upper())
+        winner_team_abbr = name_to_abbr.get(winner_name, winner_abbr.upper())
+        loser_team_abbr = name_to_abbr.get(loser_name, loser_abbr.upper())
 
         game = _find_game_for_pick(schedule, winner_name, loser_name)
         game_data = statsapi.get("game", {"gamePk": game["game_id"]}) if game else {}
         metric = get_metric_for_game(metrics_index, game_data) if game_data else None
+        home_team_name = game.get("home_name") if game else ""
+        park_home_abbr = name_to_abbr.get(home_team_name, "") if home_team_name else ""
 
         weather = (
             _extract_weather(game_data)
@@ -1380,6 +1633,23 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             "line_movement_text": line_move["text"],
             "total_line_text": total_market["text"],
             "total_movement_text": total_market["movement_text"],
+            "ballpark_run_history": _ballpark_run_history_text(
+                winner_id,
+                winner_name,
+                loser_id,
+                loser_name,
+                weather.get("venue", "Unknown Venue"),
+                today,
+            ),
+            "savant_park_contact_context": _savant_park_contact_context(
+                winner_name,
+                winner_team_abbr,
+                loser_name,
+                loser_team_abbr,
+                park_home_abbr,
+                weather.get("venue", "Unknown Venue"),
+                today,
+            ),
             "winner_lineup_announced": winner_lineup_announced,
             "loser_lineup_announced": loser_lineup_announced,
             "lineup_status_text": _lineup_status_text(
@@ -1435,6 +1705,8 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
         lines.append(f"- **Line Movement:** {context['line_movement_text']}")
         lines.append(f"- **Total Line:** {context['total_line_text']}")
         lines.append(f"- **Total Movement:** {context['total_movement_text']}")
+        lines.append(f"- **Ballpark Run History:** {context['ballpark_run_history']}")
+        lines.append(f"- **Savant Park Contact Context:** {context['savant_park_contact_context']}")
         lines.append(f"- **Bullpen Total Context:** {context['bullpen_total_context']}")
         lines.append(f"- **Platoon Total Context:** {context['platoon_total_context']}")
         lines.append(f"- **Umpire Total Context:** {context['umpire_total_context']}")
