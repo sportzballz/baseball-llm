@@ -2804,6 +2804,44 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         """
     )
 
+    # Top run-total confidence strategy: every day except Sunday
+    rt_no_sun_running = 0.0
+    rt_no_sun_series = []
+    rt_no_sun_wins = 0
+    rt_no_sun_losses = 0
+    rt_no_sun_decided = 0
+    for h in asc:
+        d = h.get('date', '')
+        include = False
+        try:
+            include = datetime.strptime(d, '%Y-%m-%d').strftime('%A') != 'Sunday'
+        except Exception:
+            include = False
+        if not include:
+            continue
+        seg = _seg(h, 'top_run_total_confidence_pick')
+        decided = int(seg.get('decided', 0) or 0)
+        if decided <= 0:
+            continue
+        rt_no_sun_running += float(seg.get('profit', 0.0) or 0.0)
+        rt_no_sun_series.append(round(rt_no_sun_running, 2))
+        rt_no_sun_wins += int(seg.get('wins', 0) or 0)
+        rt_no_sun_losses += int(seg.get('losses', 0) or 0)
+        rt_no_sun_decided += decided
+
+    rt_no_sun_roi = ((rt_no_sun_running / (rt_no_sun_decided * 100.0)) * 100.0) if rt_no_sun_decided else None
+    rt_no_sun_roi_txt = f"{rt_no_sun_roi:.2f}%" if rt_no_sun_roi is not None else '—'
+    chart_cards.append(
+        f"""
+        <div class='chart-card'>
+          <h3>Top Run Total Confidence — Mon-Sat (No Sunday)</h3>
+          <div class='chart-meta'>Record: {rt_no_sun_wins}-{rt_no_sun_losses} • Profit: ${rt_no_sun_running:.2f} • ROI: {rt_no_sun_roi_txt}</div>
+          {_svg_line(rt_no_sun_series, '#38bdf8')}
+          <div class='chart-foot'>Cumulative profit from highest-confidence run-total pick, betting every day except Sunday (flat $100 stake)</div>
+        </div>
+        """
+    )
+
     def _top_rt_cell(h):
         top = h.get('top_run_total_pick') or {}
         winner = str(top.get('winner') or '').strip()
