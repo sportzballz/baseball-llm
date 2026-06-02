@@ -3041,7 +3041,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">Top Run Total Confidence Pick — Day-of-Week Split</h2>
+      <h2 style="margin-top:0">Top Run Total Confidence — Day-by-Day Performance</h2>
       <div class="meta">{dow_best_meta}</div>
       <table>
         <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Sample</th></tr></thead>
@@ -3052,7 +3052,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">Top Run Total Confidence — Strategy Day Split Table</h2>
+      <h2 style="margin-top:0">Top Run Total Confidence — Weekly Split</h2>
       <table>
         <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
         <tbody>{rt_ns_dow_rows}</tbody>
@@ -3081,7 +3081,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">Plus Money — Strategy Day Split Table</h2>
+      <h2 style="margin-top:0">Plus Money — Weekly Split</h2>
       <table>
         <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
         <tbody>{pm_dow_rows}</tbody>
