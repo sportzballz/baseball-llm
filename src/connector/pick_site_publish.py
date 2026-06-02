@@ -2852,9 +2852,9 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
 
     # Day-split tables for strategy charts (auto-updated from history every render)
     pm_strategy_days = ['Tuesday', 'Wednesday', 'Thursday']
-    pm_dow_stats = {d: {'decided': 0, 'wins': 0, 'losses': 0, 'profit': 0.0} for d in pm_strategy_days}
+    pm_dow_stats = {d: {'decided': 0, 'wins': 0, 'losses': 0, 'profit': 0.0} for d in dow_order}
     rt_ns_days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-    rt_ns_stats = {d: {'decided': 0, 'wins': 0, 'losses': 0, 'profit': 0.0} for d in rt_ns_days}
+    rt_ns_stats = {d: {'decided': 0, 'wins': 0, 'losses': 0, 'profit': 0.0} for d in dow_order}
 
     for h in history:
         d = h.get('date', '')
@@ -2896,8 +2896,8 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             )
         return ''.join(out) if out else '<tr><td colspan="5">No history yet.</td></tr>'
 
-    pm_dow_rows = _dow_rows(pm_dow_stats, pm_strategy_days)
-    rt_ns_dow_rows = _dow_rows(rt_ns_stats, rt_ns_days)
+    pm_dow_rows = _dow_rows(pm_dow_stats, dow_order)
+    rt_ns_dow_rows = _dow_rows(rt_ns_stats, dow_order)
 
     # Pull latest available intraday-impact aggregate if present in history.
     intraday_impact = None
@@ -3047,14 +3047,14 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
       <h2 style="margin-top:0">Strategy Day Split Tables (Auto-updated Daily)</h2>
       <div class="chart-grid">
         <div class="chart-card">
-          <h3>Plus Money — Tue/Wed/Thu</h3>
+          <h3>Plus Money — All Days of Week</h3>
           <table>
             <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
             <tbody>{pm_dow_rows}</tbody>
           </table>
         </div>
         <div class="chart-card">
-          <h3>Top Run Total Confidence — Mon-Sat (No Sunday)</h3>
+          <h3>Top Run Total Confidence — All Days of Week</h3>
           <table>
             <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
             <tbody>{rt_ns_dow_rows}</tbody>
