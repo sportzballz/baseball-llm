@@ -2654,7 +2654,9 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         return f"<svg viewBox='0 0 {w} {h}' class='spark'><line x1='{pad}' y1='{h-pad}' x2='{w-pad}' y2='{h-pad}' stroke='#31508e' /><polyline fill='none' stroke='{color}' stroke-width='2.5' points='{' '.join(pts)}' /></svg>"
 
     asc = sorted(history, key=lambda x: x.get('date', ''))
-    chart_cards = []
+    run_total_chart_cards = []
+    plus_money_chart_cards = []
+    other_chart_cards = []
     for key, label, color in category_defs:
         running = 0.0
         series = []
@@ -2663,8 +2665,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             series.append(round(running, 2))
         t = totals[key]
         roi_txt = f"{t['roi_pct']}%" if t['roi_pct'] is not None else '—'
-        chart_cards.append(
-            f"""
+        card_html = f"""
             <div class='chart-card'>
               <h3>{label}</h3>
               <div class='chart-meta'>Record: {t['wins']}-{t['losses']} • Profit: ${t['profit']:.2f} • ROI: {roi_txt}</div>
@@ -2672,7 +2673,12 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
               <div class='chart-foot'>Cumulative profit (flat $100 per decided pick)</div>
             </div>
             """
-        )
+        if key in ('run_total_picks', 'top_run_total_confidence_pick'):
+            run_total_chart_cards.append(card_html)
+        elif key == 'plus_money_picks':
+            plus_money_chart_cards.append(card_html)
+        else:
+            other_chart_cards.append(card_html)
 
     # Custom strategy chart: only bet highest-confidence run totals on Tuesdays and Thursdays
     tt_running = 0.0
@@ -2702,7 +2708,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
 
     tt_roi = ((tt_running / (tt_decided * 100.0)) * 100.0) if tt_decided else None
     tt_roi_txt = f"{tt_roi:.2f}%" if tt_roi is not None else '—'
-    chart_cards.append(
+    run_total_chart_cards.append(
         f"""
         <div class='chart-card'>
           <h3>Top Run Total Confidence — Tue/Thu Only</h3>
@@ -2740,7 +2746,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
 
     pm_twt_roi = ((pm_twt_running / (pm_twt_decided * 100.0)) * 100.0) if pm_twt_decided else None
     pm_twt_roi_txt = f"{pm_twt_roi:.2f}%" if pm_twt_roi is not None else '—'
-    chart_cards.append(
+    plus_money_chart_cards.append(
         f"""
         <div class='chart-card'>
           <h3>Plus Money Picks — Tue/Wed/Thu Only</h3>
@@ -2778,7 +2784,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
 
     rt_no_sun_roi = ((rt_no_sun_running / (rt_no_sun_decided * 100.0)) * 100.0) if rt_no_sun_decided else None
     rt_no_sun_roi_txt = f"{rt_no_sun_roi:.2f}%" if rt_no_sun_roi is not None else '—'
-    chart_cards.append(
+    run_total_chart_cards.append(
         f"""
         <div class='chart-card'>
           <h3>Top Run Total Confidence — Mon-Sat (No Sunday)</h3>
@@ -2788,6 +2794,8 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         </div>
         """
     )
+
+    chart_cards = run_total_chart_cards + plus_money_chart_cards + other_chart_cards
 
     def _top_rt_cell(h):
         top = h.get('top_run_total_pick') or {}
