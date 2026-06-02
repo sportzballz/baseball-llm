@@ -3052,23 +3052,11 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     </div>
 
     <div class="card">
-      <h2 style="margin-top:0">Strategy Day Split Tables (Auto-updated Daily)</h2>
-      <div class="chart-grid">
-        <div class="chart-card">
-          <h3>Plus Money — All Days of Week</h3>
-          <table>
-            <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
-            <tbody>{pm_dow_rows}</tbody>
-          </table>
-        </div>
-        <div class="chart-card">
-          <h3>Top Run Total Confidence — All Days of Week</h3>
-          <table>
-            <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
-            <tbody>{rt_ns_dow_rows}</tbody>
-          </table>
-        </div>
-      </div>
+      <h2 style="margin-top:0">Top Run Total Confidence — Strategy Day Split Table</h2>
+      <table>
+        <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
+        <tbody>{rt_ns_dow_rows}</tbody>
+      </table>
     </div>
 
     <div class="card">
@@ -3090,6 +3078,14 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         </div>
       </div>
       <div class="chart-foot">Buckets: up_big/down_big = ±0.05 confidence move; range buckets: low &lt;0.07, medium 0.07-0.119, high ≥0.12.</div>
+    </div>
+
+    <div class="card">
+      <h2 style="margin-top:0">Plus Money — Strategy Day Split Table</h2>
+      <table>
+        <thead><tr><th>Day</th><th>Record</th><th>Win Rate</th><th>Profit</th><th>Bets</th></tr></thead>
+        <tbody>{pm_dow_rows}</tbody>
+      </table>
     </div>
 
     <div class="card">
