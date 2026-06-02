@@ -186,7 +186,7 @@ if [[ "$COMMENTARY_POLISH_JOB" =~ ^(1|true|yes|on)$ ]]; then
     #     sleep 5
     #   fi
     # done
-    sleep 300
+    sleep 180
   fi
 fi
 
