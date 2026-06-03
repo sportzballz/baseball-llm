@@ -108,18 +108,27 @@ def _odds_api_mlb(today):
         totals = []
         over_prices = []
         under_prices = []
+        bookmaker_moneyline = {}
 
         for b in g.get("bookmakers") or []:
+            book_key = str(b.get("key") or "").strip().lower()
             for m in b.get("markets") or []:
                 mk = m.get("key")
                 outcomes = m.get("outcomes") or []
                 if mk == "h2h":
                     oh = next((o for o in outcomes if o.get("name") == home), None)
                     oa = next((o for o in outcomes if o.get("name") == away), None)
-                    if oh:
-                        home_ml.append(_safe_int(oh.get("price")))
-                    if oa:
-                        away_ml.append(_safe_int(oa.get("price")))
+                    home_price = _safe_int(oh.get("price")) if oh else None
+                    away_price = _safe_int(oa.get("price")) if oa else None
+                    if home_price is not None:
+                        home_ml.append(home_price)
+                    if away_price is not None:
+                        away_ml.append(away_price)
+                    if book_key:
+                        bookmaker_moneyline[book_key] = {
+                            "homeOdds": home_price,
+                            "awayOdds": away_price,
+                        }
                 elif mk == "totals":
                     oo = next((o for o in outcomes if str(o.get("name", "")).lower() == "over"), None)
                     ou = next((o for o in outcomes if str(o.get("name", "")).lower() == "under"), None)
@@ -146,6 +155,7 @@ def _odds_api_mlb(today):
                             # from first-seen snapshot persistence in _apply_opening_snapshot.
                             "open": {"homeOdds": None, "awayOdds": None},
                             "current": {"homeOdds": home_cur, "awayOdds": away_cur},
+                            "bookmakers": bookmaker_moneyline,
                         },
                         "total": {
                             "open": {"total": None},

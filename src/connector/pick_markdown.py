@@ -381,6 +381,14 @@ def _get_injuries(team_id):
         return []
 
 
+def _display_pick_odds(consensus_odds, betmgm_odds=None):
+    consensus_txt = _format_odds(consensus_odds) if consensus_odds is not None else '----'
+    betmgm_txt = _format_odds(betmgm_odds) if betmgm_odds is not None else None
+    if betmgm_txt:
+        return f"{consensus_txt} (BetMGM: {betmgm_txt})"
+    return consensus_txt
+
+
 def _extract_line_movement(odds_entry, winner_name):
     if not odds_entry:
         return {
@@ -407,6 +415,9 @@ def _extract_line_movement(odds_entry, winner_name):
         or _safe_get(odds_obj or {}, ["moneyline", "open", side])
     )
 
+    books_map = _safe_get(odds_obj or {}, ["moneyline", "bookmakers"], {}) or {}
+    betmgm_side_odds = _safe_get(books_map, ["betmgm", f"{side}Odds"])
+
     movement = None
     if isinstance(current, (int, float)) and isinstance(open_odds, (int, float)):
         movement = current - open_odds
@@ -421,7 +432,7 @@ def _extract_line_movement(odds_entry, winner_name):
         direction = "toward" if movement < 0 else "away from"
         text = f"Moneyline moved from {open_odds} to {current} ({movement:+}), {direction} the pick side."
 
-    return {"current": current, "open": open_odds, "movement": movement, "text": text}
+    return {"current": current, "open": open_odds, "movement": movement, "text": text, "betmgm": betmgm_side_odds}
 
 
 def _extract_total_market(odds_entry):
@@ -1612,7 +1623,7 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
             "analyst_title": style_entry["analyst_title"],
             "winner": winner_name,
             "loser": loser_name,
-            "odds": _format_odds(p.odds),
+            "odds": _display_pick_odds(p.odds, line_move.get('betmgm')),
             "confidence": p.confidence,
             "data_points": p.data_points,
             "winner_signals": ", ".join(p.winning_stats[:15])
@@ -1678,6 +1689,8 @@ def write_daily_pick_markdown(predictions, odds_data, model_name):
         lines.append(f"## {idx}) {winner_name} over {loser_name}")
         lines.append("")
         lines.append(f"- **Pick Odds:** {context['odds']}")
+        if line_move.get('betmgm') is not None:
+            lines.append(f"- **BetMGM Odds:** {_format_odds(line_move.get('betmgm'))}")
         lines.append(
             f"- **Model Confidence:** {context['confidence']} (data points: {context['data_points']})"
         )
