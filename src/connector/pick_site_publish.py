@@ -370,7 +370,8 @@ def _analytics_scripts():
     parts = []
     if CLOUDFLARE_ANALYTICS_TOKEN:
         token = html.escape(CLOUDFLARE_ANALYTICS_TOKEN)
-        parts.append(f'<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{{"token": "{token}"}}"></script>')
+        beacon_json = html.escape(json.dumps({"token": CLOUDFLARE_ANALYTICS_TOKEN}), quote=True)
+        parts.append(f'<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{beacon_json}"></script>')
     if PLAUSIBLE_DOMAIN:
         plausible_domain = html.escape(PLAUSIBLE_DOMAIN)
         plausible_src = html.escape(PLAUSIBLE_SRC)
