@@ -12,6 +12,9 @@ import statsapi
 
 SITE_BASE_URL = os.environ.get('SPORTZBALLZ_SITE_URL', 'https://sportzballz.io').rstrip('/')
 HIT_COUNTER_ENDPOINT = os.environ.get('SPORTZBALLZ_HIT_COUNTER_ENDPOINT', 'https://5pakmkcroalpibvk2y7did66pu0extmx.lambda-url.us-east-1.on.aws/').strip()
+CLOUDFLARE_ANALYTICS_TOKEN = os.environ.get('SPORTZBALLZ_CLOUDFLARE_ANALYTICS_TOKEN', '').strip()
+PLAUSIBLE_DOMAIN = os.environ.get('SPORTZBALLZ_PLAUSIBLE_DOMAIN', '').strip()
+PLAUSIBLE_SRC = os.environ.get('SPORTZBALLZ_PLAUSIBLE_SRC', 'https://plausible.io/js/script.js').strip()
 
 ANALYST_PANEL = [
     {'id': 'mack-ledger', 'name': 'Mack Ledger', 'title': 'Market Maker', 'voice': 'sharp, odds-first, risk language, no fluff'},
@@ -363,10 +366,23 @@ def _embed_mode_script():
 '''
 
 
+def _analytics_scripts():
+    parts = []
+    if CLOUDFLARE_ANALYTICS_TOKEN:
+        token = html.escape(CLOUDFLARE_ANALYTICS_TOKEN)
+        parts.append(f'<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon="{{"token": "{token}"}}"></script>')
+    if PLAUSIBLE_DOMAIN:
+        plausible_domain = html.escape(PLAUSIBLE_DOMAIN)
+        plausible_src = html.escape(PLAUSIBLE_SRC)
+        parts.append(f'<script defer data-domain="{plausible_domain}" src="{plausible_src}"></script>')
+    return ('\n  ' + '\n  '.join(parts)) if parts else ''
+
+
 def _hit_counter_script():
     endpoint = html.escape(HIT_COUNTER_ENDPOINT)
+    analytics = _analytics_scripts()
     return f'''
-  <script>window.SBZ_HIT_ENDPOINT = "{endpoint}";</script>
+  <script>window.SBZ_HIT_ENDPOINT = "{endpoint}";</script>{analytics}
   <script defer src="/assets/hit-counter.js"></script>
 '''
 
