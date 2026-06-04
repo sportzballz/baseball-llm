@@ -1877,11 +1877,13 @@ def _render_run_totals_html(parsed, evaluated_picks=None, latest_date=None, arch
           <div><span>Confidence</span><strong>{l['confidence']}</strong></div>
           <div><span>Venue</span><strong>{html.escape(l['venue'])}</strong></div>
           <div><span>Game Info</span><strong>{html.escape(_first_pitch_text(src_pick).replace('First pitch: ', 'Start: '))}</strong></div>
+          <div><span>Pitching Matchup</span><strong>{html.escape(_field(src_pick,'Pitching Matchup','n/a'))}</strong></div>
         </div>
         <p class="lede">Run-total lens: {l['pick']} {l['line']} in {l['winner']} vs {l['loser']}. Confidence is driven by weather and wind context, park/run environment, team offense-vs-prevention signals, total-line movement, and supporting run indicators (bullpen/platoon/umpire/pitch mix), plus historical and Savant contact baselines. Key bearing factors here: {', '.join(l['reasons']) if l['reasons'] else 'balanced conditions and market context'}.</p>
         <details>
           <summary>Expanded total context</summary>
           <ul>
+            <li><strong>Pitching Matchup:</strong> {html.escape(_field(src_pick,'Pitching Matchup','n/a'))}</li>
             <li><strong>Weather:</strong> {html.escape(l['weather'])}</li>
             <li><strong>Total Movement:</strong> {html.escape(l['total_movement'])}</li>
           </ul>
