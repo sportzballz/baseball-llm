@@ -2659,20 +2659,26 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             'total': sum(_seg(h, key).get('total', 0) for h in history),
         }
 
-    def _svg_line(values, color):
+    def _svg_line(values, color, start_label='', end_label=''):
         w, h, pad = 360, 120, 10
+        axis_y = h - pad - 16
+        label_y = h - 2
+        start_label = html.escape(start_label or '')
+        end_label = html.escape(end_label or '')
         if not values:
-            return f"<svg viewBox='0 0 {w} {h}' class='spark'><line x1='{pad}' y1='{h-pad}' x2='{w-pad}' y2='{h-pad}' stroke='#31508e' /></svg>"
+            return f"<svg viewBox='0 0 {w} {h}' class='spark'><line x1='{pad}' y1='{axis_y}' x2='{w-pad}' y2='{axis_y}' stroke='#31508e' /><text x='{pad}' y='{label_y}' fill='#a7b7df' font-size='10'>{start_label}</text><text x='{w-pad}' y='{label_y}' text-anchor='end' fill='#a7b7df' font-size='10'>{end_label}</text></svg>"
         vmin, vmax = min(values), max(values)
         span = (vmax - vmin) if vmax != vmin else 1
         pts = []
         for i, v in enumerate(values):
             x = pad + (i * (w - 2 * pad) / max(1, len(values) - 1))
-            y = h - pad - ((v - vmin) / span) * (h - 2 * pad)
+            y = axis_y - ((v - vmin) / span) * (h - 2 * pad - 16)
             pts.append(f"{x:.1f},{y:.1f}")
-        return f"<svg viewBox='0 0 {w} {h}' class='spark'><line x1='{pad}' y1='{h-pad}' x2='{w-pad}' y2='{h-pad}' stroke='#31508e' /><polyline fill='none' stroke='{color}' stroke-width='2.5' points='{' '.join(pts)}' /></svg>"
+        return f"<svg viewBox='0 0 {w} {h}' class='spark'><line x1='{pad}' y1='{axis_y}' x2='{w-pad}' y2='{axis_y}' stroke='#31508e' /><polyline fill='none' stroke='{color}' stroke-width='2.5' points='{' '.join(pts)}' /><text x='{pad}' y='{label_y}' fill='#a7b7df' font-size='10'>{start_label}</text><text x='{w-pad}' y='{label_y}' text-anchor='end' fill='#a7b7df' font-size='10'>{end_label}</text></svg>"
 
     asc = sorted(history, key=lambda x: x.get('date', ''))
+    chart_start_label = asc[0].get('date', '') if asc else ''
+    chart_end_label = asc[-1].get('date', '') if asc else ''
     run_total_chart_cards = []
     plus_money_chart_cards = []
     other_chart_cards = []
@@ -2688,7 +2694,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
             <div class='chart-card'>
               <h3>{label}</h3>
               <div class='chart-meta'>Record: {t['wins']}-{t['losses']} • Profit: ${t['profit']:.2f} • ROI: {roi_txt}</div>
-              {_svg_line(series, color)}
+              {_svg_line(series, color, chart_start_label, chart_end_label)}
               <div class='chart-foot'>Cumulative profit (flat $100 per decided pick)</div>
             </div>
             """
@@ -2732,7 +2738,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         <div class='chart-card'>
           <h3>Top Run Total Confidence — Tue/Thu Only</h3>
           <div class='chart-meta'>Record: {tt_wins}-{tt_losses} • Profit: ${tt_running:.2f} • ROI: {tt_roi_txt}</div>
-          {_svg_line(tt_series, '#facc15')}
+          {_svg_line(tt_series, '#facc15', chart_start_label, chart_end_label)}
           <div class='chart-foot'>Cumulative profit betting only Tuesdays & Thursdays (flat $100 stake)</div>
         </div>
         """
@@ -2770,7 +2776,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         <div class='chart-card'>
           <h3>Plus Money Picks — Tue/Wed/Thu Only</h3>
           <div class='chart-meta'>Record: {pm_twt_wins}-{pm_twt_losses} • Profit: ${pm_twt_running:.2f} • ROI: {pm_twt_roi_txt}</div>
-          {_svg_line(pm_twt_series, '#f97316')}
+          {_svg_line(pm_twt_series, '#f97316', chart_start_label, chart_end_label)}
           <div class='chart-foot'>Cumulative plus-money profit for bets placed only on Tue/Wed/Thu (flat $100 stake)</div>
         </div>
         """
@@ -2808,7 +2814,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
         <div class='chart-card'>
           <h3>Top Run Total Confidence — Mon-Sat (No Sunday)</h3>
           <div class='chart-meta'>Record: {rt_no_sun_wins}-{rt_no_sun_losses} • Profit: ${rt_no_sun_running:.2f} • ROI: {rt_no_sun_roi_txt}</div>
-          {_svg_line(rt_no_sun_series, '#38bdf8')}
+          {_svg_line(rt_no_sun_series, '#38bdf8', chart_start_label, chart_end_label)}
           <div class='chart-foot'>Cumulative profit from highest-confidence run-total pick, betting every day except Sunday (flat $100 stake)</div>
         </div>
         """
