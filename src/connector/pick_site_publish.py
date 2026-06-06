@@ -1238,9 +1238,22 @@ def _evaluate_picks(parsed, frozen_totals=None):
 
     top_rt_pick = top_rt_conf[0] if top_rt_conf else None
 
+    fade_best_conf = []
+    for p in best_conf:
+        opp = dict(p)
+        r = str(p.get('result', 'PENDING')).upper()
+        if r == 'WIN':
+            opp['result'] = 'LOSS'
+        elif r == 'LOSS':
+            opp['result'] = 'WIN'
+        else:
+            opp['result'] = r
+        fade_best_conf.append(opp)
+
     segments = {
         'all_picks': _segment_stats(evaluated),
         'best_confidence_pick': _segment_stats(best_conf),
+        'fade_best_confidence_pick': _segment_stats(fade_best_conf),
         'top3_confidence_picks': _segment_stats(top3_conf),
         'plus_money_picks': _segment_stats(plus),
         'run_total_picks': _segment_stats(run_totals),
@@ -2587,6 +2600,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
     category_defs = [
         ('all_picks', 'All Picks', '#5cc9ff'),
         ('best_confidence_pick', 'Best Confidence Pick', '#a78bfa'),
+        ('fade_best_confidence_pick', 'Fade Best Confidence Pick', '#f87171'),
         ('top3_confidence_picks', 'Top 3 Confidence Picks', '#34d399'),
         ('plus_money_picks', 'Plus Money Picks', '#f59e0b'),
         ('run_total_picks', 'Run Total Picks', '#fb7185'),
@@ -2695,7 +2709,7 @@ def _render_dashboard(history, latest_date=None, archive_dates=None):
               <h3>{label}</h3>
               <div class='chart-meta'>Record: {t['wins']}-{t['losses']} • Profit: ${t['profit']:.2f} • ROI: {roi_txt}</div>
               {_svg_line(series, color, chart_start_label, chart_end_label)}
-              <div class='chart-foot'>Cumulative profit (flat $100 per decided pick)</div>
+              <div class='chart-foot'>{'Record-based fade scenario (wins/losses inverted from the top-confidence moneyline pick; profit/ROI are directional only, not true opposite-side odds)' if key == 'fade_best_confidence_pick' else 'Cumulative profit (flat $100 per decided pick)'}</div>
             </div>
             """
         if key in ('run_total_picks', 'top_run_total_confidence_pick'):
