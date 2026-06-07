@@ -196,8 +196,12 @@ echo "AGS AGS AGS " >> "$RUN_LOG" 2>&1 \
 SITE_REPO="$REPO_ROOT/../sportzballz.io"
 TODAY_ET="$(TZ=America/New_York date +%F)"
 cd "$SITE_REPO"
-# Stage any new HTML files (untracked) plus existing modifications
-git add *.html >> "$RUN_LOG" 2>&1 || true
-git commit -am "Publish daily picks + OpenClaw publish $TODAY_ET"  >> "$RUN_LOG" 2>&1 
-git push origin main >> "$RUN_LOG" 2>&1
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] Site commit/push complete for $TODAY_ET" >> "$RUN_LOG"
+# Stage all published site artifacts explicitly so polished pages are never skipped.
+git add *.html *.xml robots.txt apple-touch-icon.png data >> "$RUN_LOG" 2>&1 || true
+if ! git diff --cached --quiet; then
+  git commit -m "Publish daily picks + OpenClaw publish $TODAY_ET" >> "$RUN_LOG" 2>&1 || true
+  git push origin main >> "$RUN_LOG" 2>&1
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] Site commit/push complete for $TODAY_ET" >> "$RUN_LOG"
+else
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] No site changes to commit for $TODAY_ET" >> "$RUN_LOG"
+fi
